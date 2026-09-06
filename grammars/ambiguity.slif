@@ -1,0 +1,8 @@
+:default ::= action => ::array
+:start ::= expr
+expr ::= term                 action => ::first
+expr ::= expr '+' expr
+expr ::= expr '*' expr
+term ~ [\d]+
+:discard ~ whitespace
+whitespace ~ [\s]+

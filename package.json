@@ -1,0 +1,19 @@
+{
+  "name": "omp-marpa-reasoning",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "omp": {
+    "extensions": ["./src/extension.ts"]
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test \"tests/*.test.ts\"",
+    "smoke": "node --experimental-strip-types scripts/smoke.ts",
+    "typecheck": "npx tsc --noEmit",
+    "install:omp": "powershell -ExecutionPolicy Bypass -File scripts/install-omp.ps1"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "@types/node": "^22.10.0"
+  }
+}

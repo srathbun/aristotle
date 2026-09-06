@@ -1,0 +1,10 @@
+:default ::= action => ::array
+:start ::= statements
+statements ::= statement+
+statement ::= fact | dependency | missing
+fact ::= 'fact' '(' symbol ')'
+dependency ::= 'depends' '(' symbol ',' symbol ')'
+missing ::= 'missing' '(' symbol ')'
+symbol ~ [A-Za-z_]+
+:discard ~ whitespace
+whitespace ~ [\s]+
