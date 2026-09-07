@@ -2,9 +2,14 @@
 
 An omp TypeScript extension that registers an LLM-callable `reason` tool backed by a
 persistent Strawberry Perl worker running Marpa::R2. The tool exposes `create` / `add` /
-`parse` / `inspect` / `extend` / `reset` over versioned, immutable grammars and an
-append-only fragment stream, and reports ambiguity as first-class data
-(`VALID` / `AMBIGUOUS` / `INVALID`).
+`parse` / `inspect` / `extend` / `execute` / `reset` over versioned, immutable grammars,
+and reports ambiguity as first-class data (`VALID` / `AMBIGUOUS` / `INVALID`).
+
+A grammar is an installed, executable artifact: `create`/`extend` construct the language,
+and `execute` feeds an independent input stream that runs a fixed semantic-action
+vocabulary (`store`/`add`/`emit`) against it, returning observable `output` and `vars`.
+Example (`grammars/commands.slif`): the input `set x 10 / add x 5 / print x` yields
+`output: ["x=15"]`, `vars: { x: 15 }`.
 
 ## Prerequisites
 
@@ -52,7 +57,7 @@ grammar (`INVALID` → extend v2 → `VALID`), and session-restart persistence. 
 - `src/state.ts` — durable reasoning-state model + session reconstruction
 - `src/tool-description.ts` — LLM-facing tool contract + SLIF cheat-sheet
 - `worker/marpa-worker.pl` — Marpa::R2 worker
-- `grammars/*.slif` — example grammars (dependency, ambiguity)
+- `grammars/*.slif` — example grammars (dependency, ambiguity, commands)
 - `scripts/setup-env.ps1`, `scripts/install-omp.ps1`, `scripts/smoke.ts`
 - `tests/` — worker protocol + state tests
 - `docs/manual-smoke.md` — manual walkthrough

@@ -1,0 +1,11 @@
+:default ::= action => ::array
+:start ::= program
+program ::= command*
+command ::= set_cmd | add_cmd | print_cmd
+set_cmd ::= 'set' ident num    action => store
+add_cmd ::= 'add' ident num    action => add
+print_cmd ::= 'print' ident    action => emit
+ident ~ [A-Za-z_]+
+num ~ [0-9]+
+:discard ~ whitespace
+whitespace ~ [\s]+

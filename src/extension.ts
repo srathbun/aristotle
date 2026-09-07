@@ -4,14 +4,15 @@ import { WorkerClient, parseResultFrom, type ParseResult, type WorkerResponse } 
 import { StateStore, STATE_CUSTOM_TYPE, type ReasoningState } from "./state.ts";
 import { TOOL_DESCRIPTION } from "./tool-description.ts";
 
-const OPERATION_SET = new Set<string>(["create", "add", "parse", "inspect", "extend", "reset"]);
-type Operation = "create" | "add" | "parse" | "inspect" | "extend" | "reset";
+const OPERATION_SET = new Set<string>(["create", "add", "parse", "inspect", "extend", "execute", "reset"]);
+type Operation = "create" | "add" | "parse" | "inspect" | "extend" | "execute" | "reset";
 
 interface ReasonParams {
   operation: Operation;
   state_id?: string;
   grammar?: string;
   fragment?: string;
+  input?: string;
 }
 
 function isOperation(value: unknown): value is Operation {
@@ -25,6 +26,7 @@ function toReasonParams(value: Record<string, unknown>): ReasonParams | null {
     state_id: typeof value.state_id === "string" ? value.state_id : undefined,
     grammar: typeof value.grammar === "string" ? value.grammar : undefined,
     fragment: typeof value.fragment === "string" ? value.fragment : undefined,
+    input: typeof value.input === "string" ? value.input : undefined,
   };
 }
 
@@ -66,6 +68,24 @@ function formatParse(r: ParseResult): ToolResult {
   return { content: [{ type: "text", text }], details: { ...r } };
 }
 
+function formatExecute(r: WorkerResponse): ToolResult {
+  const status = r.status ?? "INVALID";
+  const output = Array.isArray(r.output) ? r.output.filter((x): x is string => typeof x === "string") : [];
+  const vars = typeof r.vars === "object" && r.vars !== null ? (r.vars as Record<string, number>) : {};
+  let text: string;
+  if (status === "INVALID") {
+    text = `Execute INVALID (grammar v${r.grammar_version}).`;
+    const e = r.error;
+    if (typeof e === "string") text += `\nError: ${e}`;
+  } else {
+    text = `Execute ${status} (grammar v${r.grammar_version}).`;
+    if (output.length) text += `\nOutput:\n${output.map((o) => `  ${o}`).join("\n")}`;
+    const entries = Object.entries(vars);
+    if (entries.length) text += `\nVars: ${entries.map(([k, v]) => `${k}=${v}`).join(", ")}`;
+  }
+  return { content: [{ type: "text", text }], details: { status, grammar_version: r.grammar_version, output, vars } };
+}
+
 export default function (pi: ExtensionAPI) {
   const z = pi.zod;
   const worker = new WorkerClient({ onStderr: (line) => pi.logger?.debug?.(`[marpa-worker] ${line}`) });
@@ -97,10 +117,11 @@ export default function (pi: ExtensionAPI) {
     label: "Reason (Marpa)",
     description: TOOL_DESCRIPTION,
     parameters: z.object({
-      operation: z.enum(["create", "add", "parse", "inspect", "extend", "reset"]).describe("Which operation to perform"),
+      operation: z.enum(["create", "add", "parse", "inspect", "extend", "execute", "reset"]).describe("Which operation to perform"),
       state_id: z.string().optional().describe("State id (required for all operations except create)"),
       grammar: z.string().optional().describe("Complete grammar source (create / extend)"),
       fragment: z.string().optional().describe("Fragment text to append (add)"),
+      input: z.string().optional().describe("Independent input stream to process (execute)"),
     }),
     async execute(_id, params, _signal, _onUpdate, _ctx): Promise<ToolResult> {
       const p = toReasonParams(params);
@@ -127,6 +148,8 @@ export default function (pi: ExtensionAPI) {
         return opInspect(p);
       case "extend":
         return opExtend(p);
+      case "execute":
+        return opExecute(p);
       case "reset":
         return opReset(p);
     }
@@ -206,5 +229,13 @@ export default function (pi: ExtensionAPI) {
     store.remove(p.state_id);
     await persistDeletion(p.state_id);
     return ok(`Reset state '${p.state_id}'.`, { state_id: p.state_id, reset: true });
+  }
+
+  async function opExecute(p: ReasonParams): Promise<ToolResult> {
+    if (typeof p.state_id !== "string") return err("execute requires 'state_id'");
+    if (typeof p.input !== "string") return err("execute requires an 'input' string");
+    const resp = await worker.request({ op: "execute", state_id: p.state_id, input: p.input });
+    if (!resp.ok) return workerErr(resp, "execute");
+    return formatExecute(resp);
   }
 }

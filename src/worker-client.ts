@@ -23,6 +23,8 @@ export interface WorkerResponse {
   status?: ParseStatus;
   values?: string[];
   value_count?: number;
+  output?: string[];
+  vars?: Record<string, number>;
   grammar_source?: string;
   last_parse?: unknown;
 }

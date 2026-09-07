@@ -17,6 +17,19 @@ my $TRUE   = JSON::PP::true;
 my $FALSE  = JSON::PP::false;
 my $NULL   = JSON::PP::null;
 
+# ---- fixed, safe semantic-action vocabulary (no arbitrary Perl) ----
+# The grammar references these names via `action => store/add/emit`; the worker
+# resolves them through semantics_package => 'Reason'. Each action receives
+# (context_hashref, keyword_literal, ...children).
+package Reason;
+our $runtime;   # { vars => { key => num }, log => [ strings ] }
+
+sub store { shift; my ($kw, $key, $value) = @_; $runtime->{vars}{$key} = 0 + $value; return $value; }
+sub add   { shift; my ($kw, $key, $delta) = @_; my $cur = $runtime->{vars}{$key} // 0; my $n = $cur + $delta; $runtime->{vars}{$key} = $n; return $n; }
+sub emit  { shift; my ($kw, $key) = @_; my $v = $runtime->{vars}{$key} // 'undef'; my $s = "$key=$v"; push @{$runtime->{log}}, $s; return $s; }
+
+package main;
+
 my %STATES;         # state_id => { state_id, current_version, grammars{v=>obj}, grammar_sources{v=>str}, fragments[], last_parse }
 my $state_counter = 0;
 
@@ -203,6 +216,40 @@ sub op_extend {
     send_response({ id => $id, ok => $TRUE, grammar_version => $new_version, %$result });
 }
 
+sub op_execute {
+    my ($id, $req) = @_;
+    my $state = get_state($id, $req->{state_id}) or return;
+    my $input = $req->{input};
+    if (!defined $input) {
+        send_error($id, "BAD_ARGS", "execute requires an 'input' string");
+        return;
+    }
+    # Fresh runtime per stream; the installed grammar is reused unchanged.
+    $Reason::runtime = { vars => {}, log => [] };
+    my $grammar = $state->{grammars}{ $state->{current_version} };
+    my $recce = Marpa::R2::Scanless::R->new({ grammar => $grammar, semantics_package => 'Reason' });
+    my ($status, $error);
+    my $ok = eval {
+        $recce->read(\$input);
+        $status = $recce->ambiguous() ? "AMBIGUOUS" : "VALID";
+        my $value = $recce->value();   # runs actions exactly once for a deterministic parse
+        1;
+    };
+    if (!$ok) {
+        $error  = clean_error($@);
+        $status = "INVALID";
+    }
+    my $resp = {
+        id => $id, ok => $TRUE,
+        status          => $status,
+        grammar_version => $state->{current_version},
+        output          => $Reason::runtime->{log},
+        vars            => $Reason::runtime->{vars},
+    };
+    $resp->{error} = $error if defined $error;
+    send_response($resp);
+}
+
 sub op_reset {
     my ($id, $req) = @_;
     my $sid = $req->{state_id};
@@ -248,6 +295,7 @@ while (defined(my $line = <STDIN>)) {
     elsif ($op eq 'parse')   { op_parse($id, $req); }
     elsif ($op eq 'inspect') { op_inspect($id, $req); }
     elsif ($op eq 'extend')  { op_extend($id, $req); }
+    elsif ($op eq 'execute') { op_execute($id, $req); }
     elsif ($op eq 'reset')   { op_reset($id, $req); }
     else { send_error($id, "BAD_OP", "unknown op '$op'"); }
 }

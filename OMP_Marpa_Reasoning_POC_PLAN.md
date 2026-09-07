@@ -1404,6 +1404,46 @@ Current known Marpa references:
 - https://metacpan.org/dist/Marpa-R2
 - https://metacpan.org/dist/Marpa-R2/view/pod/Tutorial2.pod
 
+## 2026-09-06 — Executable-language reframe
+
+Reframed the core concept. The project is NOT primarily a validator for LLM output.
+An LLM constructs an executable formal language, instantiates the machine for it,
+then feeds a separately supplied input stream that the machine processes with
+semantic actions producing observable state/output. The grammar is an installed
+executable artifact, not a one-shot `parse(grammar, input)`.
+
+What the first implementation proved: grammar construction, recognition, ambiguity
+representation, dynamic grammar, and persistence — but only the *recognition*
+layer. `parse` returns a parse tree; there was no semantic-action mechanism, and
+the input was always the accumulated fragment list rather than an independent
+stream.
+
+New milestone — executable language runtime: a new `execute` operation takes an
+explicit `input` stream and runs a fixed, safe semantic-action vocabulary against
+the installed grammar, returning observable `output` and `vars`. The grammar is
+compiled once (`Scanless::G`); each `execute` spins a fresh recognizer
+(`Scanless::R` with `semantics_package`) over a fresh runtime, so one grammar
+serves many independent streams without reconstruction.
+
+Action vocabulary (fixed, no arbitrary Perl): `store` (set a variable), `add`
+(increment a variable), `emit` (append "key=value" to output). Example executable
+grammar `grammars/commands.slif`; input "set x 10 / add x 5 / print x" yields
+output ["x=15"], vars { x: 15 }.
+
+Revised roadmap:
+1 Marpa worker (done) · 2 OMP extension (done) · 3 ambiguity representation (done)
+4 persistent state (done) · 5 dynamic grammar (done) · 6 executable language runtime
+(done) · 7 independent input streams (done, via `execute`) · 8 semantic actions /
+observable effects (done, minimal vocabulary) · 9 ambiguous executable languages
+10 LLM-driven ambiguity resolution · 11 grammar modification after runtime
+failure/ambiguity · 12 Ruby Slippers (if still justified) · 13 branching/versioned
+languages · 14 research experiments and baselines.
+
+Open design question deferred to milestone 9: how `execute` should behave when the
+grammar is ambiguous (side-effecting actions run per parse tree, so they must not
+be silently multiplied). `execute` currently reports AMBIGUOUS and runs only the
+first parse's actions.
+
 ---
 
 # 35. Future Directions — Do Not Implement Yet
@@ -1420,7 +1460,6 @@ Potential later research directions include:
 - grammar merge operations;
 - persistent reasoning across sessions;
 - multiple cooperating reasoning languages;
-- semantic actions;
 - external facts attached to parse nodes;
 - integration with tool-call planning;
 - using ambiguity as a trigger for information gathering;

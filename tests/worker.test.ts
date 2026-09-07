@@ -9,6 +9,7 @@ import { resolvePerlPath, resolveWorkerScript } from "../src/worker-paths.ts";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const dependencyGrammar = readFileSync(join(repoRoot, "grammars", "dependency.slif"), "utf8");
 const ambiguityGrammar = readFileSync(join(repoRoot, "grammars", "ambiguity.slif"), "utf8");
+const commandsGrammar = readFileSync(join(repoRoot, "grammars", "commands.slif"), "utf8");
 
 // Widened dependency grammar (adds `causes(A,B)`) used for the v1->v2 reparse test.
 const widenedGrammar = [
@@ -186,4 +187,40 @@ test("worker stays alive across 20 sequential requests", async () => {
   const parse = await worker.request({ op: "parse", state_id: "bulk" });
   assert.equal(parse.status, "VALID");
   assert.equal(parse.fragment_count, 20);
+});
+
+test("execute: a constructed grammar processes an independent stream with semantic effects", async () => {
+  await worker.request({ op: "create", state_id: "exec", grammar: commandsGrammar });
+  // The input stream is supplied AFTER construction, and is not part of the grammar.
+  const r = await worker.request({ op: "execute", state_id: "exec", input: "set x 10\nadd x 5\nprint x" });
+  assert.equal(r.ok, true);
+  assert.equal(r.status, "VALID");
+  assert.deepEqual(r.output, ["x=15"]);
+  assert.deepEqual(r.vars, { x: 15 });
+});
+
+test("execute: one installed grammar serves multiple independent streams", async () => {
+  await worker.request({ op: "create", state_id: "exec2", grammar: commandsGrammar });
+  const a = await worker.request({ op: "execute", state_id: "exec2", input: "set y 3\nprint y" });
+  assert.deepEqual(a.vars, { y: 3 });
+  assert.deepEqual(a.output, ["y=3"]);
+  const b = await worker.request({ op: "execute", state_id: "exec2", input: "set z 7\nadd z 2\nprint z" });
+  assert.deepEqual(b.vars, { z: 9 });
+  assert.deepEqual(b.output, ["z=9"]);
+});
+
+test("execute: invalid input yields INVALID with an error", async () => {
+  const r = await worker.request({ op: "execute", state_id: "exec", input: "set x abc" });
+  assert.equal(r.ok, true);
+  assert.equal(r.status, "INVALID");
+  assert.ok(typeof r.error === "string" && r.error.length > 0);
+});
+
+test("execute: grammar without actions yields VALID with empty effects", async () => {
+  await worker.request({ op: "create", state_id: "noact", grammar: dependencyGrammar });
+  const r = await worker.request({ op: "execute", state_id: "noact", input: "fact(A) depends(A,B)" });
+  assert.equal(r.ok, true);
+  assert.equal(r.status, "VALID");
+  assert.deepEqual(r.output, []);
+  assert.deepEqual(r.vars, {});
 });
