@@ -23,6 +23,9 @@ export interface WorkerResponse {
   status?: ParseStatus;
   values?: string[];
   value_count?: number;
+  progress?: string;
+  index?: number;
+  value?: string;
   output?: string[];
   emitted?: string[];
   vars?: Record<string, number>;
@@ -37,6 +40,7 @@ export interface ParseResult {
   values: string[];
   value_count: number;
   error?: string;
+  progress?: string;
 }
 
 /** Validate an unknown value into a ParseResult (used for worker responses and persisted state). */
@@ -51,6 +55,7 @@ export function parseResultFrom(value: unknown): ParseResult | null {
     values: Array.isArray(r.values) ? r.values.filter((x): x is string => typeof x === "string") : [],
     value_count: typeof r.value_count === "number" ? r.value_count : 0,
     ...(typeof r.error === "string" ? { error: r.error } : {}),
+    ...(typeof r.progress === "string" ? { progress: r.progress } : {}),
   };
 }
 

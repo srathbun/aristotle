@@ -4,8 +4,8 @@ import { WorkerClient, parseResultFrom, type ParseResult, type WorkerResponse } 
 import { StateStore, STATE_CUSTOM_TYPE, type ReasoningState } from "./state.ts";
 import { TOOL_DESCRIPTION } from "./tool-description.ts";
 
-const OPERATION_SET = new Set<string>(["create", "add", "parse", "inspect", "extend", "execute", "reset"]);
-type Operation = "create" | "add" | "parse" | "inspect" | "extend" | "execute" | "reset";
+const OPERATION_SET = new Set<string>(["create", "add", "parse", "inspect", "extend", "execute", "commit", "fork", "reset"]);
+type Operation = "create" | "add" | "parse" | "inspect" | "extend" | "execute" | "commit" | "fork" | "reset";
 
 interface ReasonParams {
   operation: Operation;
@@ -13,6 +13,8 @@ interface ReasonParams {
   grammar?: string;
   fragment?: string;
   input?: string;
+  index?: number;
+  new_state_id?: string;
 }
 
 function isOperation(value: unknown): value is Operation {
@@ -27,6 +29,8 @@ function toReasonParams(value: Record<string, unknown>): ReasonParams | null {
     grammar: typeof value.grammar === "string" ? value.grammar : undefined,
     fragment: typeof value.fragment === "string" ? value.fragment : undefined,
     input: typeof value.input === "string" ? value.input : undefined,
+    index: typeof value.index === "number" ? value.index : undefined,
+    new_state_id: typeof value.new_state_id === "string" ? value.new_state_id : undefined,
   };
 }
 
@@ -64,6 +68,7 @@ function formatParse(r: ParseResult): ToolResult {
   } else {
     text = `Parse INVALID (grammar v${r.grammar_version}, ${r.fragment_count} fragment${r.fragment_count === 1 ? "" : "s"}).`;
     if (r.error) text += `\nError: ${r.error}`;
+    if (r.progress) text += `\nExpected:\n${r.progress}`;
   }
   return { content: [{ type: "text", text }], details: { ...r } };
 }
@@ -73,11 +78,20 @@ function formatExecute(r: WorkerResponse): ToolResult {
   const output = Array.isArray(r.output) ? r.output.filter((x): x is string => typeof x === "string") : [];
   const emitted = Array.isArray(r.emitted) ? r.emitted.filter((x): x is string => typeof x === "string") : [];
   const vars = typeof r.vars === "object" && r.vars !== null ? (r.vars as Record<string, number>) : {};
+  const values = Array.isArray(r.values) ? r.values.filter((x): x is string => typeof x === "string") : [];
+  const valueCount = typeof r.value_count === "number" ? r.value_count : values.length;
   let text: string;
   if (status === "INVALID") {
     text = `Execute INVALID (grammar v${r.grammar_version}).`;
     const e = r.error;
     if (typeof e === "string") text += `\nError: ${e}`;
+    if (typeof r.progress === "string" && r.progress) text += `\nExpected:\n${r.progress}`;
+  } else if (status === "AMBIGUOUS") {
+    text = `Execute AMBIGUOUS (grammar v${r.grammar_version}, ${valueCount} interpretations). No actions run.`;
+    values.forEach((v, i) => {
+      text += `\n${i + 1}. ${v}`;
+    });
+    if (valueCount > values.length) text += `\n... (${valueCount - values.length} more not shown)`;
   } else {
     text = `Execute ${status} (grammar v${r.grammar_version}).`;
     if (emitted.length) text += `\nEmitted context:\n${emitted.map((e) => `  - ${e}`).join("\n")}`;
@@ -85,7 +99,22 @@ function formatExecute(r: WorkerResponse): ToolResult {
     const entries = Object.entries(vars);
     if (entries.length) text += `\nVars: ${entries.map(([k, v]) => `${k}=${v}`).join(", ")}`;
   }
-  return { content: [{ type: "text", text }], details: { status, grammar_version: r.grammar_version, output, emitted, vars } };
+  return { content: [{ type: "text", text }], details: { status, grammar_version: r.grammar_version, output, emitted, vars, values, value_count: valueCount } };
+}
+
+function formatCommit(r: WorkerResponse): ToolResult {
+  const index = typeof r.index === "number" ? r.index : 0;
+  const chosen = typeof r.value === "string" ? r.value : "";
+  const output = Array.isArray(r.output) ? r.output.filter((x): x is string => typeof x === "string") : [];
+  const emitted = Array.isArray(r.emitted) ? r.emitted.filter((x): x is string => typeof x === "string") : [];
+  const vars = typeof r.vars === "object" && r.vars !== null ? (r.vars as Record<string, number>) : {};
+  let text = `Committed to interpretation ${index} (grammar v${r.grammar_version}).`;
+  if (chosen) text += `\nChosen: ${chosen}`;
+  if (emitted.length) text += `\nEmitted context:\n${emitted.map((e) => `  - ${e}`).join("\n")}`;
+  if (output.length) text += `\nOutput:\n${output.map((o) => `  ${o}`).join("\n")}`;
+  const entries = Object.entries(vars);
+  if (entries.length) text += `\nVars: ${entries.map(([k, v]) => `${k}=${v}`).join(", ")}`;
+  return { content: [{ type: "text", text }], details: { status: "VALID", grammar_version: r.grammar_version, index, chosen, output, emitted, vars } };
 }
 
 export default function (pi: ExtensionAPI) {
@@ -119,11 +148,13 @@ export default function (pi: ExtensionAPI) {
     label: "Reason (Marpa)",
     description: TOOL_DESCRIPTION,
     parameters: z.object({
-      operation: z.enum(["create", "add", "parse", "inspect", "extend", "execute", "reset"]).describe("Which operation to perform"),
+      operation: z.enum(["create", "add", "parse", "inspect", "extend", "execute", "commit", "fork", "reset"]).describe("Which operation to perform"),
       state_id: z.string().optional().describe("State id (required for all operations except create)"),
       grammar: z.string().optional().describe("Complete grammar source (create / extend)"),
       fragment: z.string().optional().describe("Fragment text to append (add)"),
-      input: z.string().optional().describe("Independent input stream to process (execute)"),
+      input: z.string().optional().describe("Independent input stream to process (execute / commit)"),
+      index: z.number().optional().describe("1-based interpretation index to commit to (commit)"),
+      new_state_id: z.string().optional().describe("State id for the new forked state (fork)"),
     }),
     async execute(_id, params, _signal, _onUpdate, _ctx): Promise<ToolResult> {
       const p = toReasonParams(params);
@@ -152,6 +183,10 @@ export default function (pi: ExtensionAPI) {
         return opExtend(p);
       case "execute":
         return opExecute(p);
+      case "commit":
+        return opCommit(p);
+      case "fork":
+        return opFork(p);
       case "reset":
         return opReset(p);
     }
@@ -239,5 +274,32 @@ export default function (pi: ExtensionAPI) {
     const resp = await worker.request({ op: "execute", state_id: p.state_id, input: p.input });
     if (!resp.ok) return workerErr(resp, "execute");
     return formatExecute(resp);
+  }
+
+  async function opCommit(p: ReasonParams): Promise<ToolResult> {
+    if (typeof p.state_id !== "string") return err("commit requires 'state_id'");
+    if (typeof p.input !== "string") return err("commit requires an 'input' string");
+    if (typeof p.index !== "number") return err("commit requires a numeric 'index'");
+    const resp = await worker.request({ op: "commit", state_id: p.state_id, input: p.input, index: p.index });
+    if (!resp.ok) return workerErr(resp, "commit");
+    return formatCommit(resp);
+  }
+
+  async function opFork(p: ReasonParams): Promise<ToolResult> {
+    if (typeof p.state_id !== "string") return err("fork requires 'state_id'");
+    const src = store.get(p.state_id);
+    if (!src) return err(`state '${p.state_id}' not found`);
+    const req: Record<string, unknown> = { op: "fork", state_id: p.state_id };
+    if (typeof p.new_state_id === "string") req.new_state_id = p.new_state_id;
+    const resp = await worker.request(req);
+    if (!resp.ok || typeof resp.state_id !== "string") return workerErr(resp, "fork");
+    const child = src.forkAs(resp.state_id);
+    store.adoptFork(child);
+    await persist(child);
+    return ok(`Forked state '${child.stateId}' from '${src.stateId}' (grammar v${child.grammarVersion}, ${child.fragments.length} fragment${child.fragments.length === 1 ? "" : "s"}).`, {
+      state_id: child.stateId,
+      parent_state_id: src.stateId,
+      grammar_version: child.grammarVersion,
+    });
   }
 }

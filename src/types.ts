@@ -43,6 +43,7 @@ export interface ZodSchemaLike {
 export interface ZodLike {
   object(shape: Record<string, ZodSchemaLike>): ZodSchemaLike;
   string(): ZodSchemaLike;
+  number(): ZodSchemaLike;
   enum(values: readonly string[]): ZodSchemaLike;
 }
 

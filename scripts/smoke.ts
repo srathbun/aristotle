@@ -58,6 +58,18 @@ const smokeEmit = [
   "whitespace ~ [ ]+",
 ].join("\n");
 
+const smokeAmbiguousExec = [
+  ":default ::= action => ::array",
+  ":start ::= program",
+  "program ::= expr   action => emit",
+  "expr ::= term                 action => ::first",
+  "expr ::= expr '+' expr",
+  "expr ::= expr '*' expr",
+  "term ~ [0-9]+",
+  ":discard ~ whitespace",
+  "whitespace ~ [ ]+",
+].join("\n");
+
 interface ReasonResult {
   text: string;
   inner: Record<string, unknown>;
@@ -207,6 +219,29 @@ ${smokeEmit}
 
 Then reply with only the emitted text.`;
 
+const s6Prompt = `You MUST call the "reason" tool exactly three times as listed below. Do not reply with text only — actually make every tool call, in order. After the first call the state_id is "r1".
+
+1. reason: operation "create", grammar exactly:
+${smokeAmbiguousExec}
+
+2. reason: operation "execute", state_id "r1", input "1+2*3"
+3. reason: operation "commit", state_id "r1", input "1+2*3", index 1
+
+Then reply with only the chosen interpretation.`;
+
+const s7Prompt = `You MUST call the "reason" tool exactly four times as listed below. Do not reply with text only — actually make every tool call, in order. After the first call the state_id is "r1".
+
+1. reason: operation "create", grammar exactly:
+${smokeDependency}
+
+2. reason: operation "execute", state_id "r1", input "causes(A,B)"
+3. reason: operation "extend", state_id "r1", grammar exactly:
+${smokeWidened}
+
+4. reason: operation "execute", state_id "r1", input "causes(A,B)"
+
+Then reply with only the final execute status word.`;
+
 const scenarios = [
   scenario("S1 basic parse", s1Prompt, (rs) => {
     const created = rs.some((r) => r.text.includes("Created reasoning state"));
@@ -230,6 +265,19 @@ const scenarios = [
     const exec = rs.find((r) => Array.isArray(r.inner.emitted) && r.inner.emitted.length > 0);
     if (exec) return { pass: true, detail: `emitted: ${JSON.stringify(exec.inner.emitted)}` };
     return { pass: false, detail: `no emitted context; ${reasonsText(rs)}` };
+  }),
+  scenario("S6 commit", s6Prompt, (rs) => {
+    const amb = rs.find((r) => r.text.includes("AMBIGUOUS"));
+    const commit = rs.find((r) => r.text.includes("Committed to interpretation"));
+    if (amb && commit) return { pass: true, detail: `ambiguous -> commit (${rs.length} calls)` };
+    return { pass: false, detail: `amb=${!!amb} commit=${!!commit}; ${reasonsText(rs)}` };
+  }),
+  scenario("S7 repair loop", s7Prompt, (rs) => {
+    const invalid = rs.some((r) => r.text.includes("Execute INVALID"));
+    const extended = rs.some((r) => r.text.includes("Extended to grammar v2"));
+    const valid = rs.some((r) => r.text.includes("Execute VALID"));
+    if (invalid && extended && valid) return { pass: true, detail: `execute INVALID -> extend v2 -> execute VALID (${rs.length} calls)` };
+    return { pass: false, detail: `invalid=${invalid} extended=${extended} valid=${valid}; ${reasonsText(rs)}` };
   }),
 ];
 

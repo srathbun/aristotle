@@ -11,6 +11,7 @@ const dependencyGrammar = readFileSync(join(repoRoot, "grammars", "dependency.sl
 const ambiguityGrammar = readFileSync(join(repoRoot, "grammars", "ambiguity.slif"), "utf8");
 const commandsGrammar = readFileSync(join(repoRoot, "grammars", "commands.slif"), "utf8");
 const observationGrammar = readFileSync(join(repoRoot, "grammars", "observation.slif"), "utf8");
+const ambiguousExecGrammar = readFileSync(join(repoRoot, "grammars", "ambiguous-exec.slif"), "utf8");
 
 // Widened dependency grammar (adds `causes(A,B)`) used for the v1->v2 reparse test.
 const widenedGrammar = [
@@ -259,4 +260,119 @@ test("emit: a fixed literal rule emits a fixed message", async () => {
   const r = await worker.request({ op: "execute", state_id: "fixed", input: "Potential conflict detected" });
   assert.equal(r.status, "VALID");
   assert.deepEqual(r.emitted, ["Potential conflict detected"]);
+});
+
+test("execute: ambiguous input reports AMBIGUOUS and runs no actions", async () => {
+  await worker.request({ op: "create", state_id: "ambx", grammar: ambiguousExecGrammar });
+  const r = await worker.request({ op: "execute", state_id: "ambx", input: "1+2*3" });
+  assert.equal(r.ok, true);
+  assert.equal(r.status, "AMBIGUOUS");
+  assert.ok(r.value_count >= 2);
+  assert.ok(r.values.length >= 2);
+  assert.ok(r.values.every((v: string) => v.length > 0));
+  // Side effects must not have run on the ambiguous machine.
+  assert.deepEqual(r.output, []);
+  assert.deepEqual(r.emitted, []);
+  assert.deepEqual(r.vars, {});
+});
+
+test("execute: unambiguous input under the same grammar runs actions", async () => {
+  await worker.request({ op: "create", state_id: "ambu", grammar: ambiguousExecGrammar });
+  const r = await worker.request({ op: "execute", state_id: "ambu", input: "42" });
+  assert.equal(r.ok, true);
+  assert.equal(r.status, "VALID");
+  assert.equal(r.value_count, 1);
+  assert.deepEqual(r.emitted, ["42"]);
+  assert.deepEqual(r.output, []);
+  assert.deepEqual(r.vars, {});
+});
+
+test("commit: selects a specific interpretation of an ambiguous input", async () => {
+  await worker.request({ op: "create", state_id: "commit", grammar: ambiguousExecGrammar });
+  const ex = await worker.request({ op: "execute", state_id: "commit", input: "1+2*3" });
+  assert.equal(ex.status, "AMBIGUOUS");
+  assert.equal(ex.value_count, 2);
+  const c1 = await worker.request({ op: "commit", state_id: "commit", input: "1+2*3", index: 1 });
+  assert.equal(c1.ok, true);
+  assert.equal(c1.status, "VALID");
+  assert.equal(c1.index, 1);
+  assert.equal(c1.value, ex.values[0]);
+  const c2 = await worker.request({ op: "commit", state_id: "commit", input: "1+2*3", index: 2 });
+  assert.equal(c2.ok, true);
+  assert.equal(c2.status, "VALID");
+  assert.equal(c2.index, 2);
+  assert.equal(c2.value, ex.values[1]);
+  assert.notEqual(c1.value, c2.value);
+});
+
+test("commit: is deterministic across repeated calls", async () => {
+  const a = await worker.request({ op: "commit", state_id: "commit", input: "1+2*3", index: 2 });
+  const b = await worker.request({ op: "commit", state_id: "commit", input: "1+2*3", index: 2 });
+  assert.equal(a.value, b.value);
+});
+
+test("commit: rejects out-of-range and non-positive indexes", async () => {
+  const zero = await worker.request({ op: "commit", state_id: "commit", input: "1+2*3", index: 0 });
+  assert.equal(zero.ok, false);
+  assert.equal(zero.error.code, "BAD_ARGS");
+  const big = await worker.request({ op: "commit", state_id: "commit", input: "1+2*3", index: 99 });
+  assert.equal(big.ok, false);
+  assert.equal(big.error.code, "BAD_INDEX");
+});
+
+test("commit: rejects unambiguous input", async () => {
+  const r = await worker.request({ op: "commit", state_id: "commit", input: "42", index: 1 });
+  assert.equal(r.ok, false);
+  assert.equal(r.error.code, "NOT_AMBIGUOUS");
+});
+
+test("execute: INVALID reports expected progress, then extend yields VALID", async () => {
+  await worker.request({ op: "create", state_id: "repair", grammar: dependencyGrammar });
+  const before = await worker.request({ op: "execute", state_id: "repair", input: "causes(A,B)" });
+  assert.equal(before.ok, true);
+  assert.equal(before.status, "INVALID");
+  assert.ok(typeof before.error === "string" && before.error.length > 0);
+  assert.ok(typeof before.progress === "string" && before.progress.length > 0);
+  const ext = await worker.request({ op: "extend", state_id: "repair", grammar: widenedGrammar });
+  assert.equal(ext.ok, true);
+  assert.equal(ext.grammar_version, 2);
+  const after = await worker.request({ op: "execute", state_id: "repair", input: "causes(A,B)" });
+  assert.equal(after.ok, true);
+  assert.equal(after.status, "VALID");
+});
+
+test("fork: clones grammar history and fragments", async () => {
+  await worker.request({ op: "create", state_id: "fork1", grammar: dependencyGrammar });
+  await worker.request({ op: "add", state_id: "fork1", fragment: "fact(A)" });
+  await worker.request({ op: "extend", state_id: "fork1", grammar: widenedGrammar });
+  const f = await worker.request({ op: "fork", state_id: "fork1", new_state_id: "fork1b" });
+  assert.equal(f.ok, true);
+  assert.equal(f.state_id, "fork1b");
+  assert.equal(f.grammar_version, 2);
+  assert.equal(f.fragment_count, 1);
+  const insp = await worker.request({ op: "inspect", state_id: "fork1b" });
+  assert.equal(insp.grammar_version, 2);
+  assert.equal(insp.fragment_count, 1);
+});
+
+test("fork: mutating the child leaves the parent intact", async () => {
+  await worker.request({ op: "create", state_id: "fork2", grammar: dependencyGrammar });
+  await worker.request({ op: "add", state_id: "fork2", fragment: "fact(A)" });
+  await worker.request({ op: "fork", state_id: "fork2", new_state_id: "fork2b" });
+  await worker.request({ op: "extend", state_id: "fork2b", grammar: widenedGrammar });
+  await worker.request({ op: "add", state_id: "fork2b", fragment: "causes(A,B)" });
+  const parent = await worker.request({ op: "inspect", state_id: "fork2" });
+  assert.equal(parent.grammar_version, 1);
+  assert.equal(parent.fragment_count, 1);
+  const child = await worker.request({ op: "inspect", state_id: "fork2b" });
+  assert.equal(child.grammar_version, 2);
+  assert.equal(child.fragment_count, 2);
+});
+
+test("fork: fork of a fork composes", async () => {
+  const f = await worker.request({ op: "fork", state_id: "fork2b", new_state_id: "fork2c" });
+  assert.equal(f.ok, true);
+  const c = await worker.request({ op: "inspect", state_id: "fork2c" });
+  assert.equal(c.grammar_version, 2);
+  assert.equal(c.fragment_count, 2);
 });

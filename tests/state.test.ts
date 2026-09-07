@@ -111,3 +111,23 @@ test("a state is replayed after a worker epoch bump", async () => {
   assert.deepEqual(client.ops.map((o) => o.op), ["create"]);
   assert.equal(client.ops[0].grammar, "g1");
 });
+
+test("forkAs deep-clones history and fragments, isolating the parent", () => {
+  const s = ReasoningState.create("r1", "g1");
+  s.addFragment("f1", 1, "fact(A)");
+  s.advanceGrammar(2, "g2", null);
+
+  const child = s.forkAs("r2");
+  assert.equal(child.stateId, "r2");
+  assert.equal(child.grammarVersion, 2);
+  assert.deepEqual(child.grammarHistory, { "1": "g1", "2": "g2" });
+  assert.equal(child.fragments.length, 1);
+
+  // Mutating the child must not affect the parent.
+  child.addFragment("f2", 2, "depends(A,B)");
+  child.advanceGrammar(3, "g3", null);
+  assert.equal(s.fragments.length, 1);
+  assert.equal(s.grammarVersion, 2);
+  assert.equal(child.fragments.length, 2);
+  assert.equal(child.grammarVersion, 3);
+});

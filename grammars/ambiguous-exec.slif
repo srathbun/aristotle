@@ -1,0 +1,9 @@
+:default ::= action => ::array
+:start ::= program
+program ::= expr   action => emit
+expr ::= term                 action => ::first
+expr ::= expr '+' expr
+expr ::= expr '*' expr
+term ~ [\d]+
+:discard ~ whitespace
+whitespace ~ [\s]+

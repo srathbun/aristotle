@@ -653,6 +653,12 @@ reason for change
 
 for later analysis.
 
+**Decision (2026-09-07):** not implemented for the POC — deferred (see §34 Research
+Record). M11's LLM-driven `extend` loop already covers grammar repair using
+`show_progress` expected-production diagnostics; Marpa::R2 exposes the
+pause/resume surface (`$recce->resume`, `$recce->pause_lexeme`) if
+parser-proposed insertions are later justified.
+
 ---
 
 # 15. Session and Persistence Model
@@ -685,6 +691,12 @@ The worker should be able to reconstruct parser state from the durable reasoning
 
 This makes the system easier to debug and version.
 
+**Continuation (2026-09-07):** session continuation is done with `--resume
+<session-id>` (omp), which resumes the exact session so `getBranch()` returns that
+session's entries. omp's `-c` continuation flag is not used (smoke S4) because it
+unpredictably continues a different session, which would make `getBranch()` return
+the wrong entries and rebuild the state incorrectly.
+
 ---
 
 # 16. Branching
@@ -706,6 +718,16 @@ Do not solve complete branch-aware semantics in milestone 1.
 However, design the state API so that state IDs and immutable grammar versions make future branching possible.
 
 A branch should never accidentally mutate the reasoning state of its parent.
+
+**Implemented (2026-09-07):** two complementary mechanisms satisfy this.
+
+- **Explicit fork** — the `fork` op clones a state's full immutable grammar history
+  and a deep copy of its fragments into a new `state_id`, so hypotheses diverge
+  independently. Compiled grammar objects are shared (read-only); fragments and
+  `last_parse` are copied, so a child's `extend`/`add` never affects the parent.
+- **Session-branch isolation** — the extension rebuilds state from
+  `sessionManager.getBranch()` on `session_start`/`session_branch`/`session_tree`,
+  so each omp conversation branch reconstructs only its own append-only entries.
 
 ---
 
@@ -904,6 +926,13 @@ result changes appropriately
 ---
 
 # 22. Development Milestones
+
+> **Reconciled 2026-09-07.** The list below (M0–M7) predates the executable-language
+> reframe. The authoritative roadmap is the revised list in §34 (Research Record):
+> M0–M8 complete, M9–M13 complete, M14 (research experiments and baselines) pending.
+> This section is retained as the original design record. Mapping: original M6
+> (Ruby Slippers) → revised M12 (recorded not-justified); original M7 (first research
+> experiment) → revised M14.
 
 ## Milestone 0 — Environment verification
 
@@ -1472,6 +1501,43 @@ text (interpolation, multiple emissions, fixed literal); S5 smoke verifies the
 model receives emitted text through omp (tightly controlled: the grammar is
 supplied, because unprimed grammar construction is the deferred research
 experiment).
+
+## 2026-09-07 — Ambiguity-safe execute, commit, repair loop, Ruby Slippers gate
+
+M9–M12 closed out the revised roadmap's remaining mechanism work (M13 and M14
+still pending).
+
+- **M9 — ambiguous executable languages.** `execute` now recognizes action-free
+  first (via a `ReasonTrace` package of structural no-op stand-ins for the fixed
+  action vocabulary, matching `::array`), so side-effecting actions never run on
+  an ambiguous machine. AMBIGUOUS returns the numbered competing interpretations
+  and empty effects; only an unambiguous input runs actions. Finding: Marpa
+  resolves non-reserved `action =>` names only under a `semantics_package`, so the
+  oracle must supply one — a recognizer with no `semantics_package` dies on
+  `store`/`emit`/etc.
+
+- **M10 — LLM-driven ambiguity resolution.** New `commit` op
+  `{op, state_id, input, index}` selects the index-th interpretation (matching the
+  numbered alternatives `execute` reported) and runs only that tree's actions.
+  `value()` enumeration is deterministic, so index mapping is stable. Finding: with
+  the fixed action vocabulary the distinguishing signal between interpretations is
+  the structural rendering (S-expression), not effects — `emit` joins RHS values,
+  so two parses of the same token stream produce identical emitted text.
+
+- **M11 — grammar modification after runtime failure/ambiguity.** `execute`/`parse`
+  INVALID now return a `progress` field (Marpa `show_progress()` dotted rules) in
+  addition to the cleaned error, giving the LLM the expected productions to author
+  a `v(n+1)` grammar and re-execute. Finding: `terminals_expected()` returns
+  internal `Lex-N` ids (not readable); `show_progress()` is the readable source of
+  expected structure.
+
+- **M12 — Ruby Slippers: not justified.** Marpa::R2 does expose the pause/resume
+  surface (`$recce->resume`, `$recce->pause_lexeme`), so the Ruby Slippers
+  mechanism is technically available. It was NOT implemented: M11's
+  `show_progress` expected-production diagnostics already give the LLM enough to
+  author its own repair via `extend`, and the parser-side candidate-insertion
+  bridge (pause adverbs + resume injection loop) adds complexity with no
+  demonstrated research need. Deferred to future work (§35).
 
 ---
 

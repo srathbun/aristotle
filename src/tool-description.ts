@@ -46,9 +46,11 @@ Operations ("operation" parameter):
 - create: construct a state from a grammar (grammar v1). Returns a state_id. "state_id" may be omitted.
 - add: append one fragment (one statement/line) to a state's accumulated fragment list. Does NOT parse.
 - parse: parse the accumulated fragments under the current grammar; returns VALID, AMBIGUOUS, or INVALID (structural only, no side effects).
-- execute: process an INDEPENDENT input stream ("input" parameter) against the installed grammar, running semantic actions; returns status plus observable "emitted" (machine-generated text), "output", and "vars".
+- execute: process an INDEPENDENT input stream ("input" parameter) against the installed grammar, running semantic actions; returns status plus observable "emitted" (machine-generated text), "output", and "vars". If the input is AMBIGUOUS, NO actions run; the numbered competing interpretations are returned instead.
+- commit: resolve an AMBIGUOUS execute input by selecting one interpretation ("index" parameter, 1-based, matching the numbered alternatives execute reported). Runs that interpretation's actions and returns its "value" (structural rendering) plus effects.
 - inspect: report grammar version, fragment count, and the last parse result for a state.
 - extend: install a NEW complete grammar (v(n+1)); reparse existing fragments under it.
+- fork: clone a state (its full grammar history and fragments) into a new independent state_id so hypotheses can diverge without mutating the parent. "new_state_id" may be provided, else one is generated.
 - reset: delete a state.
 
 Grammar format (Marpa Scanless SLIF):
@@ -80,6 +82,6 @@ ${EXAMPLE_GRAMMAR}
 Important:
 - AMBIGUOUS is expected data, NOT a failure: it means multiple structural interpretations exist.
 - Never claim a conclusion is structurally resolved while the result is AMBIGUOUS.
-- You may resolve ambiguity by adding more fragments/evidence, asking other tools, or extending the grammar.
+- You may resolve ambiguity by committing to a specific interpretation ("commit" with its 1-based index), adding more fragments/evidence, asking other tools, or extending the grammar.
 - "extend" takes the complete new grammar source; every grammar change creates a new immutable version (old versions are retained for comparison).
 - "execute" is how a constructed language becomes a machine: construct the grammar once, then feed it independent input streams.`;

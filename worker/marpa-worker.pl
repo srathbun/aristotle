@@ -34,6 +34,16 @@ sub add   { shift; my ($kw, $key, $delta) = @_; my $cur = $runtime->{vars}{$key}
 sub print { shift; my ($kw, $key) = @_; my $v = $runtime->{vars}{$key} // 'undef'; my $s = "$key=$v"; push @{$runtime->{output}}, $s; return $s; }
 sub emit  { shift; my $s = join ' ', map { defined $_ ? "$_" : '' } @_; push @{$runtime->{emitted}}, $s if length $s; return $s; }
 
+# Structural stand-ins for the fixed action vocabulary. The ambiguity oracle renders
+# parse trees through this package so it can enumerate a grammar that references
+# non-reserved actions (store/add/print/emit) WITHOUT running their side effects.
+# Each stand-in returns its child values as an array, matching the ::array default.
+package ReasonTrace;
+sub store { shift; return [ @_ ]; }
+sub add   { shift; return [ @_ ]; }
+sub print { shift; return [ @_ ]; }
+sub emit  { shift; return [ @_ ]; }
+
 package main;
 
 my %STATES;         # state_id => { state_id, current_version, grammars{v=>obj}, grammar_sources{v=>str}, fragments[], last_parse }
@@ -95,13 +105,14 @@ sub _render {
     }
 }
 
-sub do_parse {
-    my ($state) = @_;
-    my $grammar = $state->{grammars}{ $state->{current_version} };
-    my $input   = join " ", map { $_->{text} } @{ $state->{fragments} };
+# Enumerate parse values for $input under $grammar WITHOUT semantic actions,
+# rendering up to 5 as S-expressions and counting all. This is the ambiguity
+# oracle: no actions are ever involved, so it is safe to call on any input.
+sub enumerate_values {
+    my ($grammar, $input) = @_;
 
-    my $recce = Marpa::R2::Scanless::R->new({ grammar => $grammar });
-    my ($status, $error, $value_count);
+    my $recce = Marpa::R2::Scanless::R->new({ grammar => $grammar, semantics_package => 'ReasonTrace' });
+    my ($status, $error, $value_count, $progress);
     my @values = ();
     $value_count = 0;
 
@@ -116,20 +127,33 @@ sub do_parse {
     if (!$ok) {
         $error  = clean_error($@);
         $status = "INVALID";
+        # Expected productions at the failure point (readable dotted rules), so the
+        # caller can act on the failure (extend the grammar) rather than just see an error.
+        my $prog = eval { $recce->show_progress() };
+        $progress = (defined $prog && length "$prog") ? "$prog" : undef;
     } elsif ($value_count > 1) {
         $status = "AMBIGUOUS";
     } else {
         $status = "VALID";
     }
+    return ($status, $value_count, \@values, $error, $progress);
+}
 
+sub do_parse {
+    my ($state) = @_;
+    my $grammar = $state->{grammars}{ $state->{current_version} };
+    my $input   = join " ", map { $_->{text} } @{ $state->{fragments} };
+
+    my ($status, $value_count, $values, $error, $progress) = enumerate_values($grammar, $input);
     my $result = {
         status          => $status,
         grammar_version => $state->{current_version},
         fragment_count  => scalar @{ $state->{fragments} },
-        values          => \@values,
+        values          => $values,
         value_count     => $value_count,
     };
     $result->{error} = $error if defined $error;
+    $result->{progress} = $progress if defined $progress;
     $state->{last_parse} = $result;
     return $result;
 }
@@ -230,31 +254,129 @@ sub op_execute {
         send_error($id, "BAD_ARGS", "execute requires an 'input' string");
         return;
     }
-    # Fresh runtime per stream; the installed grammar is reused unchanged.
-    $Reason::runtime = { vars => {}, output => [], emitted => [] };
     my $grammar = $state->{grammars}{ $state->{current_version} };
-    my $recce = Marpa::R2::Scanless::R->new({ grammar => $grammar, semantics_package => 'Reason' });
-    my ($status, $error);
-    my $ok = eval {
-        $recce->read(\$input);
-        $status = $recce->ambiguous() ? "AMBIGUOUS" : "VALID";
-        my $value = $recce->value();   # runs actions exactly once for a deterministic parse
-        1;
-    };
-    if (!$ok) {
-        $error  = clean_error($@);
-        $status = "INVALID";
+
+    # Recognize WITHOUT actions first. Side-effecting actions must never run on an
+    # ambiguous machine (they would be silently multiplied across parse trees), so
+    # ambiguity is detected action-free and surfaced to the LLM as structured feedback.
+    my ($status, $value_count, $values, $error, $progress) = enumerate_values($grammar, $input);
+
+    # Fresh runtime per stream; only an unambiguous parse runs the actions exactly once.
+    $Reason::runtime = { vars => {}, output => [], emitted => [] };
+    if (!defined $error && $status eq "VALID") {
+        my $recce = Marpa::R2::Scanless::R->new({ grammar => $grammar, semantics_package => 'Reason' });
+        my $ok = eval {
+            $recce->read(\$input);
+            $recce->value();
+            1;
+        };
+        if (!$ok) {
+            $error  = clean_error($@);
+            $status = "INVALID";
+        }
     }
+
     my $resp = {
         id => $id, ok => $TRUE,
         status          => $status,
         grammar_version => $state->{current_version},
+        values          => $values,
+        value_count     => $value_count,
         output          => $Reason::runtime->{output},
         emitted         => $Reason::runtime->{emitted},
         vars            => $Reason::runtime->{vars},
     };
     $resp->{error} = $error if defined $error;
+    $resp->{progress} = $progress if defined $progress;
     send_response($resp);
+}
+
+sub op_commit {
+    my ($id, $req) = @_;
+    my $state = get_state($id, $req->{state_id}) or return;
+    my $input = $req->{input};
+    if (!defined $input) {
+        send_error($id, "BAD_ARGS", "commit requires an 'input' string");
+        return;
+    }
+    my $index = $req->{index};
+    if (!defined $index || $index !~ /^\d+$/ || $index < 1) {
+        send_error($id, "BAD_ARGS", "commit requires a positive integer 'index'");
+        return;
+    }
+    my $grammar = $state->{grammars}{ $state->{current_version} };
+
+    # Determine the interpretation count action-free (no side effects).
+    my ($status, $value_count, $values, $error) = enumerate_values($grammar, $input);
+    if (defined $error) {
+        send_error($id, "COMMIT_INVALID", "commit input does not parse: $error");
+        return;
+    }
+    if ($status eq "VALID") {
+        send_error($id, "NOT_AMBIGUOUS", "commit requires an ambiguous input; this input is unambiguous");
+        return;
+    }
+    if ($index > $value_count) {
+        send_error($id, "BAD_INDEX", "index $index out of range (1..$value_count)");
+        return;
+    }
+
+    # Run the semantic actions on the index-th parse tree only. Earlier trees are
+    # discarded; the runtime is reset immediately before the chosen tree so that
+    # only its side effects are reported.
+    $Reason::runtime = { vars => {}, output => [], emitted => [] };
+    my $recce = Marpa::R2::Scanless::R->new({ grammar => $grammar, semantics_package => 'Reason' });
+    my $ok = eval {
+        $recce->read(\$input);
+        for (my $i = 1; $i < $index; $i++) { $recce->value(); }
+        $Reason::runtime = { vars => {}, output => [], emitted => [] };
+        $recce->value();
+        1;
+    };
+    if (!$ok) {
+        send_error($id, "COMMIT_ERROR", clean_error($@));
+        return;
+    }
+
+    send_response({
+        id => $id, ok => $TRUE,
+        status          => "VALID",
+        grammar_version => $state->{current_version},
+        index           => 0 + $index,
+        value           => $values->[$index - 1],
+        value_count     => $value_count,
+        output          => $Reason::runtime->{output},
+        emitted         => $Reason::runtime->{emitted},
+        vars            => $Reason::runtime->{vars},
+    });
+}
+
+sub op_fork {
+    my ($id, $req) = @_;
+    my $state = get_state($id, $req->{state_id}) or return;
+    my $new_id = (defined $req->{new_state_id} && length("$req->{new_state_id}"))
+        ? "$req->{new_state_id}" : new_id();
+    if (exists $STATES{$new_id}) {
+        send_error($id, "STATE_EXISTS", "state_id '$new_id' already exists");
+        return;
+    }
+    # Clone the full immutable grammar history and a deep copy of the fragments so
+    # the child diverges independently. Compiled grammar objects are shared (they are
+    # read-only once compiled); fragment records and last_parse are copied.
+    $STATES{$new_id} = {
+        state_id        => $new_id,
+        current_version => $state->{current_version},
+        grammars        => { %{ $state->{grammars} } },
+        grammar_sources => { %{ $state->{grammar_sources} } },
+        fragments       => [ map { { %$_ } } @{ $state->{fragments} } ],
+        last_parse      => ($state->{last_parse} ? { %{ $state->{last_parse} } } : undef),
+    };
+    send_response({
+        id => $id, ok => $TRUE,
+        state_id        => $new_id,
+        grammar_version => $state->{current_version},
+        fragment_count  => scalar @{ $state->{fragments} },
+    });
 }
 
 sub op_reset {
@@ -303,6 +425,8 @@ while (defined(my $line = <STDIN>)) {
     elsif ($op eq 'inspect') { op_inspect($id, $req); }
     elsif ($op eq 'extend')  { op_extend($id, $req); }
     elsif ($op eq 'execute') { op_execute($id, $req); }
+    elsif ($op eq 'commit')  { op_commit($id, $req); }
+    elsif ($op eq 'fork')    { op_fork($id, $req); }
     elsif ($op eq 'reset')   { op_reset($id, $req); }
     else { send_error($id, "BAD_OP", "unknown op '$op'"); }
 }

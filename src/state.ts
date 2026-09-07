@@ -69,6 +69,18 @@ export class ReasoningState {
     this.lastParse = lastParse;
   }
 
+  /** Deep-clone this state under a new id; grammar history and fragments are copied. */
+  forkAs(newStateId: string): ReasoningState {
+    return new ReasoningState(
+      newStateId,
+      this.grammarVersion,
+      this.grammarSource,
+      { ...this.grammarHistory },
+      this.fragments.map((f) => ({ ...f })),
+      this.lastParse,
+    );
+  }
+
   serialize(): Record<string, unknown> {
     return {
       state_id: this.stateId,
@@ -145,6 +157,12 @@ export class StateStore {
     this.states.set(stateId, s);
     this.syncEpoch.set(stateId, this.client.epoch);
     return s;
+  }
+
+  /** Register an already-forked state (already present in the worker) at the current epoch. */
+  adoptFork(state: ReasoningState): void {
+    this.states.set(state.stateId, state);
+    this.syncEpoch.set(state.stateId, this.client.epoch);
   }
 
   remove(stateId: string): void {

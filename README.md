@@ -2,8 +2,9 @@
 
 An omp TypeScript extension that registers an LLM-callable `reason` tool backed by a
 persistent Strawberry Perl worker running Marpa::R2. The tool exposes `create` / `add` /
-`parse` / `inspect` / `extend` / `execute` / `reset` over versioned, immutable grammars,
-and reports ambiguity as first-class data (`VALID` / `AMBIGUOUS` / `INVALID`).
+`parse` / `inspect` / `extend` / `execute` / `commit` / `fork` / `reset` over versioned,
+immutable grammars, and reports ambiguity as first-class data (`VALID` / `AMBIGUOUS` /
+`INVALID`).
 
 A grammar is an installed, executable artifact: `create`/`extend` construct the language,
 and `execute` feeds an independent input stream that runs a fixed semantic-action
@@ -52,9 +53,11 @@ discoverability.
 npm run smoke
 ```
 
-Runs four scenarios headlessly (`omp -p --mode json`): basic parse, ambiguity, dynamic
-grammar (`INVALID` → extend v2 → `VALID`), and session-restart persistence. Use
-`SMOKE_MODEL` to override the model (default `ollama/gpt-oss:20b`).
+Runs seven scenarios headlessly (`omp -p --mode json`): basic parse, ambiguity, dynamic
+grammar (`INVALID` → extend v2 → `VALID`), session-restart persistence, context emission,
+ambiguity commit, and runtime repair (`execute INVALID` → extend → `execute VALID`). Use
+`SMOKE_MODEL` to override the model (default `ollama/gpt-oss:20b`); `SMOKE_RUN=N` runs a
+single scenario.
 
 ## Layout
 
@@ -63,7 +66,7 @@ grammar (`INVALID` → extend v2 → `VALID`), and session-restart persistence. 
 - `src/state.ts` — durable reasoning-state model + session reconstruction
 - `src/tool-description.ts` — LLM-facing tool contract + SLIF cheat-sheet
 - `worker/marpa-worker.pl` — Marpa::R2 worker
-- `grammars/*.slif` — example grammars (dependency, ambiguity, commands, observation)
+- `grammars/*.slif` — example grammars (dependency, ambiguity, ambiguous-exec, commands, observation)
 - `scripts/setup-env.ps1`, `scripts/install-omp.ps1`, `scripts/smoke.ts`
 - `tests/` — worker protocol + state tests
 - `docs/manual-smoke.md` — manual walkthrough
