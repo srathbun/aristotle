@@ -929,8 +929,8 @@ result changes appropriately
 
 > **Reconciled 2026-09-07.** The list below (M0–M7) predates the executable-language
 > reframe. The authoritative roadmap is the revised list in §34 (Research Record):
-> M0–M8 complete, M9–M13 complete, M14 (research experiments and baselines) pending.
-> This section is retained as the original design record. Mapping: original M6
+> M0–M8 complete, M9–M13 complete, M14 (research experiments and baselines) planned
+> in §36. This section is retained as the original design record. Mapping: original M6
 > (Ruby Slippers) → revised M12 (recorded not-justified); original M7 (first research
 > experiment) → revised M14.
 
@@ -1539,6 +1539,14 @@ still pending).
   bridge (pause adverbs + resume injection loop) adds complexity with no
   demonstrated research need. Deferred to future work (§35).
 
+## 2026-09-07 — Milestone 14 research plan and one-pager
+
+Added a concrete research plan for M14 (§36) and a research one-pager (§37). The plan
+defines hypotheses H1–H5 and four experiments (constraint enforcement, compact
+persistent state, dynamically constructed machine, ambiguity + adaptive repair), each
+with explicit support/falsification criteria and a competitive baseline. No
+experiments run yet.
+
 ---
 
 # 35. Future Directions — Do Not Implement Yet
@@ -1564,3 +1572,301 @@ Potential later research directions include:
 - comparison with PEG, LR, GLR, parser combinators, constraint systems, and logic programming.
 
 These are explicitly deferred until the initial interaction model has produced evidence worth pursuing.
+
+---
+
+# 36. Milestone 14 — Research Plan
+
+## 36.1 Core research question
+
+> Can dynamically constructed generalized executable languages provide a useful
+> external computational substrate for LLM agents?
+
+We are **NOT** claiming LLMs cannot already reason. The question is narrower: can an
+LLM construct a specialized computational machine on demand, use it to process
+subsequent input, receive machine-generated context back, and modify the machine when
+its original language is inadequate?
+
+```
+LLM reasoning
+    ↓ construct language
+executable generalized grammar
+    ↓ subsequent input stream
+parse / semantic actions
+    ↓ machine-generated context
+LLM
+    ↓ resolve / extend / continue
+```
+
+Marpa's generalized parsing and ambiguity matter because the language does **not**
+have to resolve every corner case before becoming useful: a broad, simple grammar can
+be correct for the normal case while ambiguity surfaces only when an actual input hits
+the ambiguous region, and the LLM can then resolve the ambiguity or modify the
+language.
+
+## 36.2 Hypotheses
+
+- **H1 — Constraint enforcement.** A formal executable language can reduce malformed
+  structured output and enforce multi-step plans more reliably than unconstrained LLM
+  generation.
+- **H2 — Compact persistent state.** A compact executable representation can replace
+  some repetitive natural-language state, reducing context/token requirements while
+  preserving or improving reliability in long-running tasks.
+- **H3 — Constructed computation.** An LLM can construct a specialized executable
+  language and use that machine to perform useful computation over subsequent
+  information.
+- **H4 — Ambiguity as deferred commitment.** Generalized parsing allows useful
+  reasoning languages to remain intentionally underspecified, deferring rare conflicts
+  until runtime rather than forcing full specification up front.
+- **H5 — Runtime-driven adaptation.** When execution produces INVALID or AMBIGUOUS
+  feedback, an LLM can use that feedback to modify its constructed language and
+  continue successfully.
+
+## 36.3 Shared experimental discipline
+
+1. **Start small and reproducible** — small, controlled experiments before any large
+   benchmark. Each experiment must be runnable on a single machine with the existing
+   smoke harness pattern (`omp -p --mode json`, JSONL capture).
+2. **Competitive baseline** — every baseline must be capable of solving the task
+   *without* Aristotle. We measure added value, not capability gating. A treatment
+   that only "works" because the baseline is incapable is not evidence.
+3. **No self-demonstration** — no experiment may merely demonstrate that Aristotle
+   parses. The dependent variables must be task outcomes and cost, not "the tool ran".
+4. **One variable at a time** — do not vary model and mechanism in the same experiment
+   (§24). Record the exact model id and settings (§24).
+5. **Explicit support/falsification** — each experiment states, in advance, what result
+   supports the hypothesis and what result falsifies it. A null result is a valid and
+   publishable outcome.
+6. **Determinism where possible** — fixed prompts, fixed tasks, seed-repeated trials to
+   estimate variance; record everything (below).
+
+## 36.4 Logging requirements (all experiments)
+
+Per trial, capture as JSONL (extending the existing `/tmp/smoke-*.jsonl` discipline):
+
+- experiment id, model id + settings, exact prompt (system + user), task instance;
+- initial grammar, every grammar version, every input stream/fragment;
+- every tool call (op + args) and every parser response (status, values, emitted, vars);
+- final answer, ground-truth success/failure, and any malformed-output/schema violations;
+- token counts per turn and cumulative, plus wall-clock;
+- a machine-readable "condition" tag so results can be grouped.
+
+## 36.5 Experiment 1 — Constraint enforcement (H1)
+
+- **Task class.** Produce a structured multi-step artifact/plan with a mechanically
+  checkable schema. Concrete candidate: given N components with dependencies, emit a
+  build/deploy plan whose every step carries `(id, command, depends-on[], artifact)`,
+  in a valid topological order. Ground-truth validity is machine-checkable (schema +
+  ordering), independent of the LLM.
+- **Baselines.** A = prompt-only generation (schema documented in the prompt). B =
+  ordinary structured tool use (generic JSON-output/file tool + self-check, with the
+  same schema documented).
+- **Treatment.** C = Aristotle: the model constructs a grammar encoding the schema,
+  executes the plan stream, and iterates on `VALID`/`INVALID` feedback.
+- **Model(s).** One model per run. Start with the config-injected local model for cheap
+  iteration; repeat with a more capable model if the local model cannot solve the
+  baseline at all (see confounders).
+- **Trials.** ≥10 distinct tasks per condition, repeated ≥2× for variance.
+- **Independent variables.** Condition (A/B/C); task instance (random effect).
+- **Dependent variables.** Task success; malformed-output count per attempt;
+  retries/corrections; tokens (total and per task); tool calls; execution failures
+  (Aristotle INVALID/AMBIGUOUS counts).
+- **Success criteria.** C yields fewer malformed outputs *and* task success ≥ the best
+  baseline, at a token cost no worse than a pre-specified multiple of B (e.g. ≤1.5×).
+- **Confounders.** Schema leakage (the grammar itself documents the schema — A and B
+  MUST receive equivalent schema documentation in the prompt); model capability floor
+  (if the baseline cannot solve at all, the comparison is vacuous — use a model that
+  solves the baseline at least part of the time).
+- **Supports H1 if** C reduces malformed outputs or retries while matching/exceeding
+  A/B success at acceptable cost.
+- **Falsifies H1 if** C shows no reduction in malformed outputs versus schema-aware B
+  (the external parser adds nothing over the LLM self-checking against the same
+  schema), or C's cost exceeds its benefit.
+
+## 36.6 Experiment 2 — Compact persistent state (H2)
+
+- **Task class.** Long-running stateful task where state is repeatedly updated and
+  consulted. Concrete candidate: a multi-turn tracker (e.g. project task board) over
+  20–40 turns — add items, change status, query summaries — plus a mid-task "reload"
+  that forces state reconstruction.
+- **Baselines.** A = prose/context (state re-stated in natural language, appended).
+  B = ordinary structured tool use (a plain key/value store via tools).
+- **Treatment.** C = Aristotle: state encoded in a compact DSL, updated/queried via
+  `store`/`add`/`emit`/`execute`.
+- **Model(s).** One model per run.
+- **Trials.** ≥5 long tasks (each task = many turns), repeated ≥2×.
+- **Independent variables.** Condition; task.
+- **Dependent variables.** Cumulative and per-turn tokens/context; final state accuracy
+  vs ground truth; reconstruction errors after reload; task success; number of
+  interactions.
+- **Success criteria.** C achieves state accuracy and task success ≥ A at meaningfully
+  lower cumulative token/context usage.
+- **Confounders.** DSL structure advantage (A/B must get equivalent schema docs); state
+  size (tasks must have state that genuinely exceeds a trivial threshold); prose-drift
+  variance (seed-repeat).
+- **Supports H2 if** C matches A's accuracy while using fewer tokens for state upkeep.
+- **Falsifies H2 if** C's token savings are negligible, or C loses accuracy vs B (a
+  plain KV store already captures the benefit; the executable DSL adds nothing).
+
+## 36.7 Experiment 3 — Dynamically constructed reasoning machine (H3)
+
+- **Task class.** A problem where a specialized computational procedure could
+  plausibly help, with **no** instruction to build a language. Concrete candidate:
+  audit a dependency graph for violations (cycles, missing deps), or compute a
+  reachability/closure over a dataset. The task must be solvable without Aristotle.
+- **Baselines.** A = ordinary reasoning (no tools). B = ordinary tool use.
+- **Treatment.** C = Aristotle, with **no prescribed grammar**. The model decides
+  whether to construct a language, what it represents, what input to feed it, and how
+  to use the returned context. (The prompt mentions the `reason` tool exists; it does
+  not dictate the grammar.)
+- **Model(s).** One model; additionally run a capable model, since a weak model may
+  simply never construct (informative in itself, but confounds "does construction help
+  when it happens").
+- **Trials.** ≥10.
+- **Independent variables.** Condition; task; (optional) an explicit vs implicit
+  permission-to-construct hint.
+- **Dependent variables.** Whether it constructs (binary); grammar complexity/size;
+  number of executions; volume of machine-generated context and whether that context
+  appears in subsequent reasoning (qualitative + proxy: does the model consume emitted
+  values in later decisions); task success vs baseline; tokens; tool calls.
+- **Success criteria.** C ≥ baseline success, and in constructing runs the machine
+  performs demonstrably useful computation (emitted context the model could not
+  trivially reproduce, and which it actually uses) rather than serving as a scratchpad.
+- **Confounders.** Construction overhead (the grammar is itself token cost); the
+  "fancy scratchpad" failure mode; model ability to design any grammar.
+- **Supports H3 if** constructing-and-executing runs beat the model's own
+  non-constructing runs and the baselines, with the emitted context demonstrably
+  influencing decisions.
+- **Falsifies H3 if** the machine is used as a scratchpad with no measurable benefit
+  (success ≈ baseline, or construction cost dominates) — construction is theater.
+
+The critical question this experiment answers: *does the machine actually perform
+useful computational work, rather than merely serving as a fancy scratchpad?*
+
+## 36.8 Experiment 4 — Ambiguity and adaptive repair (H4 + H5)
+
+- **Task class.** Tasks with genuine ambiguity or underspecification that must be
+  resolved mid-task, plus a second phase where the initial language fails on a new
+  input type. Concrete candidate: a spec with two valid structural readings leading to
+  different downstream conclusions (precedence / dependency grouping), then a new input
+  class the grammar cannot parse.
+- **Conditions.** A = ordinary reasoning (no tools). B = ordinary structured tool use.
+  C = Aristotle, fixed grammar, ambiguity surfaced but no resolution primitive. D =
+  Aristotle full (ambiguity detection + `commit` + `extend`).
+- **Model(s).** One model per run.
+- **Trials.** ≥10 ambiguous tasks.
+- **Independent variables.** Condition; task; ambiguity type (precedence vs structural
+  vs lexical).
+- **Dependent variables.** Ambiguity detected vs guessed-through (binary: did the model
+  act on `AMBIGUOUS`, or silently pick one?); resolution quality (chosen interpretation
+  correct/justified vs ground-truth intent); number of grammar modifications (D);
+  recovery rate (fraction where an initial INVALID/AMBIGUOUS led to a correct final
+  answer); tokens; tool calls; final task success.
+- **Success criteria.** D's recovery rate ≥ C's, and both ≥ baseline when tasks
+  genuinely require disambiguation; the model treats AMBIGUOUS as a signal (stops,
+  resolves, extends) rather than an error it ignores.
+- **Confounders.** Tasks that are ambiguous in name but guessable in practice (guessing
+  wrong must be costly, or the parser's signal has no value); the "guess-through"
+  tendency (a model that always picks the first interpretation ignores the signal —
+  this is exactly the falsification).
+- **Supports H4 if** ambiguity is detected and deferred, and deferring improves
+  resolution quality vs silently guessing. **Supports H5 if** after INVALID/AMBIGUOUS
+  the model modifies the grammar (`extend`) and recovers more often than pure
+  prompt-retry.
+- **Falsifies if** the model guesses through ambiguity as often as baseline (no
+  deferred-decision benefit) and/or never productively extends the grammar — ambiguity
+  is just an error condition, not a mechanism.
+
+## 36.9 Sequencing and go/no-go gates
+
+Run in dependency-light order: E1 and E2 first (small, cheap, controlled), then E3
+(open-ended, exploratory), then E4 (depends on `commit`/`extend` being well-exercised).
+Each experiment has a gate: if the small version shows no signal **and** no obvious
+design fix, do not scale it into a benchmark — record the null result and move on.
+
+---
+
+# 37. RESEARCH ONE-PAGER / ELEVATOR PITCH
+
+## 37.1 The 60-second pitch
+
+> LLMs reason in natural language — flexible, but not checkable. We're testing whether
+> an LLM can do better by building itself a small formal, *executable* language on
+> demand: a grammar plus a runtime. It constructs that machine once, feeds it later
+> input, gets machine-checked results back, and — crucially — can *change the machine*
+> when it hits something the language can't handle.
+>
+> The twist is the parser is *generalized*, so it preserves ambiguity instead of
+> rejecting it. The language doesn't have to nail down every edge case up front: you
+> leave the rare conflicts unresolved, and only when a real input actually hits one
+> does the ambiguity surface — and then the LLM resolves it or extends the language.
+>
+> We've built the machinery — construct, execute, detect ambiguity, commit to a choice,
+> extend the grammar — and verified it end to end. What we have *not* shown is that any
+> of this measurably helps an LLM do a real task better than ordinary reasoning and
+> ordinary tools. That's the experiment.
+
+## 37.2 One-page explanation
+
+1. **The problem.** LLM reasoning lives in natural language: expressive but
+   unstructured, hard to validate, and — over long tasks — token-hungry and
+   drift-prone. Errors are only caught when the model (or a human) happens to re-read
+   the output.
+
+2. **The core idea.** Let the LLM externalize part of its reasoning as a *formal,
+   executable language* it designs itself — a grammar plus a runtime — and use that
+   machine to process subsequent input with guaranteed, deterministic checking.
+
+3. **How it differs from ordinary tool use.** Ordinary tools are fixed: a calculator
+   adds, a shell runs commands, a file stores bytes. Here the *language itself is the
+   tool the model builds* — its vocabulary, structure, and effects are defined by the
+   model for the task at hand, then enforced deterministically. It's not "call a fixed
+   function"; it's "define and compile a small machine".
+
+4. **Why generalized parsing / Marpa.** A conventional parser rejects anything not in
+   the grammar; a *generalized* parser (Earley/Marpa) preserves *all* parses and reports
+   ambiguity as data. That lets the language be intentionally loose and still useful.
+
+5. **Why dynamically constructed languages matter.** A fixed grammar must be specified
+   in advance by someone else. Here the model builds the language when it needs it and
+   evolves it as the task unfolds — the grammar is *state*, not configuration.
+
+6. **Why ambiguity can be a feature, not a failure.** Ambiguity means "multiple
+   structural interpretations exist" — deferred commitment. The model doesn't have to
+   pre-resolve every conflict; it can defer until a real input hits the ambiguous
+   region, then resolve or refine. Underspecification becomes a strategy, not a bug.
+
+7. **Practical utility cases.** (a) enforcing schemas; (b) validating multi-step plans;
+   (c) compact persistent state across long tasks; (d) token reduction via dense
+   grammars/DSLs; (e) reusable executable procedures the model writes once and runs
+   many times.
+
+8. **The deeper hypothesis.** That externalized, executable, *machine-checked*
+   reasoning is a useful computational substrate for LLM agents — a different point on
+   the spectrum between pure natural-language reasoning and fixed, pre-built tooling.
+
+9. **What Aristotle currently demonstrates (built, not yet proven useful).**
+   End-to-end infrastructure: construct a versioned grammar; execute independent input
+   streams with a fixed semantic-action vocabulary (`store`/`add`/`print`/`emit`);
+   detect and enumerate ambiguity; `commit` to one interpretation; `extend` the grammar
+   after failure; `fork` diverging hypotheses. All of it is deterministic, tested, and
+   smoke-verified through omp.
+
+10. **What remains to be experimentally established.** That any of the above produces
+    a *measurable* benefit over a competitive baseline for a real task. This is
+    unproven. The M14 plan (§36) specifies four experiments (H1–H5) with explicit
+    support/falsification criteria.
+
+## 37.3 Claim discipline (what each assertion is)
+
+| Statement | Status |
+|---|---|
+| Grammar construction, execution, ambiguity, commit, extend, fork work end to end | **Demonstrated** (tests + smoke, M0–M13) |
+| Emitted context is returned to the LLM and can be incorporated into reasoning | **Demonstrated** (S5; a manual multi-loop run used it) |
+| The machine performs *useful* computation that changes outcomes vs baselines | **Hypothesis (unproven)** — H3, Experiment 3 |
+| Executable languages reduce malformed output / enforce plans | **Hypothesis (unproven)** — H1, Experiment 1 |
+| Compact DSL state reduces tokens without losing accuracy | **Hypothesis (unproven)** — H2, Experiment 2 |
+| Ambiguity is a useful deferred-decision mechanism, not an error | **Hypothesis (unproven)** — H4/H5, Experiment 4 |
+| Aristotle improves an LLM agent on a real task | **Unproven** |
+
+Do not cite any "unproven" row as established.
