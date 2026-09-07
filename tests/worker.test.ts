@@ -10,6 +10,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const dependencyGrammar = readFileSync(join(repoRoot, "grammars", "dependency.slif"), "utf8");
 const ambiguityGrammar = readFileSync(join(repoRoot, "grammars", "ambiguity.slif"), "utf8");
 const commandsGrammar = readFileSync(join(repoRoot, "grammars", "commands.slif"), "utf8");
+const observationGrammar = readFileSync(join(repoRoot, "grammars", "observation.slif"), "utf8");
 
 // Widened dependency grammar (adds `causes(A,B)`) used for the v1->v2 reparse test.
 const widenedGrammar = [
@@ -222,5 +223,40 @@ test("execute: grammar without actions yields VALID with empty effects", async (
   assert.equal(r.ok, true);
   assert.equal(r.status, "VALID");
   assert.deepEqual(r.output, []);
+  assert.deepEqual(r.emitted, []);
   assert.deepEqual(r.vars, {});
+});
+
+test("emit: a grammar rule emits machine-generated text from an independent stream", async () => {
+  await worker.request({ op: "create", state_id: "emit", grammar: observationGrammar });
+  const r = await worker.request({ op: "execute", state_id: "emit", input: "conflict alice and bob" });
+  assert.equal(r.ok, true);
+  assert.equal(r.status, "VALID");
+  assert.deepEqual(r.emitted, ["conflict alice and bob"]);
+  assert.deepEqual(r.output, []);
+});
+
+test("emit: interpolates parsed values and preserves multiple emissions in order", async () => {
+  const r = await worker.request({
+    op: "execute",
+    state_id: "emit",
+    input: "conflict alice and bob conflict bob and carol",
+  });
+  assert.equal(r.status, "VALID");
+  assert.deepEqual(r.emitted, ["conflict alice and bob", "conflict bob and carol"]);
+});
+
+test("emit: a fixed literal rule emits a fixed message", async () => {
+  const grammar = [
+    ":default ::= action => ::array",
+    ":start ::= program",
+    "program ::= warn*",
+    "warn ::= 'Potential conflict detected'   action => emit",
+    ":discard ~ whitespace",
+    "whitespace ~ [\\s]+",
+  ].join("\n");
+  await worker.request({ op: "create", state_id: "fixed", grammar });
+  const r = await worker.request({ op: "execute", state_id: "fixed", input: "Potential conflict detected" });
+  assert.equal(r.status, "VALID");
+  assert.deepEqual(r.emitted, ["Potential conflict detected"]);
 });

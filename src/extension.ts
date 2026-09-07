@@ -71,6 +71,7 @@ function formatParse(r: ParseResult): ToolResult {
 function formatExecute(r: WorkerResponse): ToolResult {
   const status = r.status ?? "INVALID";
   const output = Array.isArray(r.output) ? r.output.filter((x): x is string => typeof x === "string") : [];
+  const emitted = Array.isArray(r.emitted) ? r.emitted.filter((x): x is string => typeof x === "string") : [];
   const vars = typeof r.vars === "object" && r.vars !== null ? (r.vars as Record<string, number>) : {};
   let text: string;
   if (status === "INVALID") {
@@ -79,11 +80,12 @@ function formatExecute(r: WorkerResponse): ToolResult {
     if (typeof e === "string") text += `\nError: ${e}`;
   } else {
     text = `Execute ${status} (grammar v${r.grammar_version}).`;
+    if (emitted.length) text += `\nEmitted context:\n${emitted.map((e) => `  - ${e}`).join("\n")}`;
     if (output.length) text += `\nOutput:\n${output.map((o) => `  ${o}`).join("\n")}`;
     const entries = Object.entries(vars);
     if (entries.length) text += `\nVars: ${entries.map(([k, v]) => `${k}=${v}`).join(", ")}`;
   }
-  return { content: [{ type: "text", text }], details: { status, grammar_version: r.grammar_version, output, vars } };
+  return { content: [{ type: "text", text }], details: { status, grammar_version: r.grammar_version, output, emitted, vars } };
 }
 
 export default function (pi: ExtensionAPI) {

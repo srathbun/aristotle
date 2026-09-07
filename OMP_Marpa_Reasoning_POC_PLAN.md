@@ -1444,6 +1444,35 @@ grammar is ambiguous (side-effecting actions run per parse tree, so they must no
 be silently multiplied). `execute` currently reports AMBIGUOUS and runs only the
 first parse's actions.
 
+## 2026-09-06 — Context emission (machine-generated text)
+
+Added the context-emission primitive. The executable machine can now DELIBERATELY
+produce text for the LLM, distinct from computed output and internal state:
+
+- `vars` — internal semantic state (`store` / `add`).
+- `output` — computed results (`print`).
+- `emitted` — machine-generated context text (`emit`).
+
+New action `emit`: joins the matched rule's right-hand-side values (literal
+template words + captured lexemes) into one space-separated string, appended to
+`emitted`. So `observation ::= 'conflict' ident 'and' ident action => emit` on
+input "conflict alice and bob" emits "conflict alice and bob"; a single-literal
+rule emits a fixed message. This is dynamic (interpolates parsed values) and
+deterministic (multiple emissions appear in input order). The prior `emit` action
+(which printed a variable's value) was renamed `print`.
+
+Data flow: Marpa rule fires -> `Reason::emit` -> worker execute result
+`{ emitted: [...] }` -> extension renders an "Emitted context:" section -> omp
+tool result -> LLM context.
+
+This milestone proves `machine -> text -> LLM-visible result`. It does NOT yet
+prove the LLM USES that text to change its reasoning — that is the next
+experiment. Tests: worker tests prove construct -> independent stream -> emitted
+text (interpolation, multiple emissions, fixed literal); S5 smoke verifies the
+model receives emitted text through omp (tightly controlled: the grammar is
+supplied, because unprimed grammar construction is the deferred research
+experiment).
+
 ---
 
 # 35. Future Directions — Do Not Implement Yet

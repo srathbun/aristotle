@@ -1,0 +1,7 @@
+:default ::= action => ::array
+:start ::= program
+program ::= observation*
+observation ::= 'conflict' ident 'and' ident   action => emit
+ident ~ [A-Za-z_]+
+:discard ~ whitespace
+whitespace ~ [\s]+

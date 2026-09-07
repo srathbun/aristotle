@@ -7,9 +7,15 @@ and reports ambiguity as first-class data (`VALID` / `AMBIGUOUS` / `INVALID`).
 
 A grammar is an installed, executable artifact: `create`/`extend` construct the language,
 and `execute` feeds an independent input stream that runs a fixed semantic-action
-vocabulary (`store`/`add`/`emit`) against it, returning observable `output` and `vars`.
-Example (`grammars/commands.slif`): the input `set x 10 / add x 5 / print x` yields
-`output: ["x=15"]`, `vars: { x: 15 }`.
+vocabulary against it, returning three kinds of observable result:
+
+- `vars` — internal state (`store` / `add`),
+- `output` — computed results (`print`),
+- `emitted` — machine-generated context text returned to the LLM (`emit`).
+
+Example (`grammars/commands.slif`): input `set x 10 add x 5 print x` yields
+`output: ["x=15"]`, `vars: { x: 15 }`. Example (`grammars/observation.slif`): input
+`conflict alice and bob` yields `emitted: ["conflict alice and bob"]`.
 
 ## Prerequisites
 
@@ -57,7 +63,7 @@ grammar (`INVALID` → extend v2 → `VALID`), and session-restart persistence. 
 - `src/state.ts` — durable reasoning-state model + session reconstruction
 - `src/tool-description.ts` — LLM-facing tool contract + SLIF cheat-sheet
 - `worker/marpa-worker.pl` — Marpa::R2 worker
-- `grammars/*.slif` — example grammars (dependency, ambiguity, commands)
+- `grammars/*.slif` — example grammars (dependency, ambiguity, commands, observation)
 - `scripts/setup-env.ps1`, `scripts/install-omp.ps1`, `scripts/smoke.ts`
 - `tests/` — worker protocol + state tests
 - `docs/manual-smoke.md` — manual walkthrough

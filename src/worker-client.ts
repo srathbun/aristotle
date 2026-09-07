@@ -24,6 +24,7 @@ export interface WorkerResponse {
   values?: string[];
   value_count?: number;
   output?: string[];
+  emitted?: string[];
   vars?: Record<string, number>;
   grammar_source?: string;
   last_parse?: unknown;

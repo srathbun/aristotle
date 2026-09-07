@@ -48,6 +48,16 @@ const smokeAmbiguity = [
   "whitespace ~ [ ]+",
 ].join("\n");
 
+const smokeEmit = [
+  ":default ::= action => ::array",
+  ":start ::= program",
+  "program ::= observation*",
+  "observation ::= 'conflict' name 'and' name   action => emit",
+  "name ~ [A-Za-z_]+",
+  ":discard ~ whitespace",
+  "whitespace ~ [ ]+",
+].join("\n");
+
 interface ReasonResult {
   text: string;
   inner: Record<string, unknown>;
@@ -188,6 +198,15 @@ ${smokeWidened}
 
 Then reply with only the final parse status word.`;
 
+const s5Prompt = `You MUST call the "reason" tool exactly twice as listed below. Do not reply with text only — actually make every tool call, in order. After the first call the state_id is "r1".
+
+1. reason: operation "create", grammar exactly:
+${smokeEmit}
+
+2. reason: operation "execute", state_id "r1", input "conflict alice and bob"
+
+Then reply with only the emitted text.`;
+
 const scenarios = [
   scenario("S1 basic parse", s1Prompt, (rs) => {
     const created = rs.some((r) => r.text.includes("Created reasoning state"));
@@ -206,6 +225,11 @@ const scenarios = [
     const valid = rs.some((r) => r.text.includes("Parse VALID"));
     if (invalid && extended && valid) return { pass: true, detail: `INVALID -> extend v2 -> VALID (${rs.length} calls)` };
     return { pass: false, detail: `invalid=${invalid} extended=${extended} valid=${valid}; ${rs.map((r) => r.text.slice(0, 60)).join(" | ")}` };
+  }),
+  scenario("S5 emit", s5Prompt, (rs) => {
+    const exec = rs.find((r) => Array.isArray(r.inner.emitted) && r.inner.emitted.length > 0);
+    if (exec) return { pass: true, detail: `emitted: ${JSON.stringify(exec.inner.emitted)}` };
+    return { pass: false, detail: `no emitted context; ${reasonsText(rs)}` };
   }),
 ];
 

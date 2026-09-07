@@ -21,9 +21,19 @@ const COMMANDS_GRAMMAR = [
   "command ::= set_cmd | add_cmd | print_cmd",
   "set_cmd ::= 'set' ident num    action => store",
   "add_cmd ::= 'add' ident num    action => add",
-  "print_cmd ::= 'print' ident    action => emit",
+  "print_cmd ::= 'print' ident    action => print",
   "ident ~ [A-Za-z_]+",
   "num ~ [0-9]+",
+  ":discard ~ whitespace",
+  "whitespace ~ [\\s]+",
+].join("\n");
+
+const OBSERVATION_GRAMMAR = [
+  ":default ::= action => ::array",
+  ":start ::= program",
+  "program ::= observation*",
+  "observation ::= 'conflict' ident 'and' ident   action => emit",
+  "ident ~ [A-Za-z_]+",
   ":discard ~ whitespace",
   "whitespace ~ [\\s]+",
 ].join("\n");
@@ -36,7 +46,7 @@ Operations ("operation" parameter):
 - create: construct a state from a grammar (grammar v1). Returns a state_id. "state_id" may be omitted.
 - add: append one fragment (one statement/line) to a state's accumulated fragment list. Does NOT parse.
 - parse: parse the accumulated fragments under the current grammar; returns VALID, AMBIGUOUS, or INVALID (structural only, no side effects).
-- execute: process an INDEPENDENT input stream ("input" parameter) against the installed grammar, running semantic actions; returns status plus observable "output" and "vars".
+- execute: process an INDEPENDENT input stream ("input" parameter) against the installed grammar, running semantic actions; returns status plus observable "emitted" (machine-generated text), "output", and "vars".
 - inspect: report grammar version, fragment count, and the last parse result for a state.
 - extend: install a NEW complete grammar (v(n+1)); reparse existing fragments under it.
 - reset: delete a state.
@@ -51,16 +61,18 @@ Grammar format (Marpa Scanless SLIF):
 Semantic actions (available only to "execute"; fixed vocabulary, no arbitrary code):
 - "action => store" — rule of shape ('set' ident num): set variable ident = num.
 - "action => add" — rule of shape ('add' ident num): variable ident += num.
-- "action => emit" — rule of shape ('print' ident): append "ident=value" to output.
+- "action => print" — rule of shape ('print' ident): append "ident=value" to the computed "output".
+- "action => emit" — join the rule's right-hand-side values (literal words + captured lexemes) into one space-separated string and append it to "emitted". This is the machine generating text for you: when the rule's pattern fires on the input, its rendering is returned in the tool result as "Emitted context".
 
-Executable example grammar:
+Context-emission example grammar:
+${OBSERVATION_GRAMMAR}
+
+Running execute with input "conflict alice and bob" produces emitted ["conflict alice and bob"].
+
+Computed-output example grammar:
 ${COMMANDS_GRAMMAR}
 
-Running execute with input:
-  set x 10
-  add x 5
-  print x
-produces output ["x=15"] and vars { x: 15 }.
+Running execute with input "set x 10 add x 5 print x" produces output ["x=15"] and vars { x: 15 }.
 
 Recognition example grammar:
 ${EXAMPLE_GRAMMAR}

@@ -18,15 +18,21 @@ my $FALSE  = JSON::PP::false;
 my $NULL   = JSON::PP::null;
 
 # ---- fixed, safe semantic-action vocabulary (no arbitrary Perl) ----
-# The grammar references these names via `action => store/add/emit`; the worker
+# The grammar references these names via `action => store/add/print/emit`; the worker
 # resolves them through semantics_package => 'Reason'. Each action receives
 # (context_hashref, keyword_literal, ...children).
+#
+# store / add / print observe or mutate internal state (vars) and computed output
+# (output). emit is the context-emission primitive: it renders the matched rule's
+# RHS values (literal template words + captured lexemes) into one space-joined
+# string that is returned to the LLM as machine-generated text.
 package Reason;
-our $runtime;   # { vars => { key => num }, log => [ strings ] }
+our $runtime;   # { vars => { key => num }, output => [ strings ], emitted => [ strings ] }
 
 sub store { shift; my ($kw, $key, $value) = @_; $runtime->{vars}{$key} = 0 + $value; return $value; }
 sub add   { shift; my ($kw, $key, $delta) = @_; my $cur = $runtime->{vars}{$key} // 0; my $n = $cur + $delta; $runtime->{vars}{$key} = $n; return $n; }
-sub emit  { shift; my ($kw, $key) = @_; my $v = $runtime->{vars}{$key} // 'undef'; my $s = "$key=$v"; push @{$runtime->{log}}, $s; return $s; }
+sub print { shift; my ($kw, $key) = @_; my $v = $runtime->{vars}{$key} // 'undef'; my $s = "$key=$v"; push @{$runtime->{output}}, $s; return $s; }
+sub emit  { shift; my $s = join ' ', map { defined $_ ? "$_" : '' } @_; push @{$runtime->{emitted}}, $s if length $s; return $s; }
 
 package main;
 
@@ -225,7 +231,7 @@ sub op_execute {
         return;
     }
     # Fresh runtime per stream; the installed grammar is reused unchanged.
-    $Reason::runtime = { vars => {}, log => [] };
+    $Reason::runtime = { vars => {}, output => [], emitted => [] };
     my $grammar = $state->{grammars}{ $state->{current_version} };
     my $recce = Marpa::R2::Scanless::R->new({ grammar => $grammar, semantics_package => 'Reason' });
     my ($status, $error);
@@ -243,7 +249,8 @@ sub op_execute {
         id => $id, ok => $TRUE,
         status          => $status,
         grammar_version => $state->{current_version},
-        output          => $Reason::runtime->{log},
+        output          => $Reason::runtime->{output},
+        emitted         => $Reason::runtime->{emitted},
         vars            => $Reason::runtime->{vars},
     };
     $resp->{error} = $error if defined $error;
