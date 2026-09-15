@@ -35,21 +35,22 @@ The project should remain small until an experiment demonstrates that the archit
 
 ## 2.1 Thesis
 
-The project investigates whether:
+The project investigates a question deeper than "does parsing improve LLM reasoning":
 
-> **An LLM can use an ambiguity-preserving generalized grammar as an externalized reasoning state, treating grammar construction, ambiguity resolution, and grammar extension as operations in an iterative reasoning process.**
+> **Can an LLM construct, execute, observe, and iteratively refine specialized computational machinery as part of its reasoning process?**
 
-The parser is not intended to "think for" the LLM. Instead, it provides a formal environment in which the LLM can:
+The parser is not intended to "think for" the LLM. Instead, it provides a formal environment in which the LLM can construct representations and machines, and obtain feedback about them:
 
-1. construct representations;
-2. add observations and hypotheses;
-3. ask whether its current representation is structurally valid;
-4. inspect competing interpretations;
+1. construct representations and executable languages;
+2. generate candidates and add observations/hypotheses;
+3. ask whether a structure is valid;
+4. inspect competing interpretations (ambiguity);
 5. obtain feedback about unresolved ambiguity;
 6. gather additional information;
-7. revise its representation;
-8. extend the language when the existing grammar is inadequate;
-9. reparse accumulated reasoning under the new language.
+7. execute semantic computations and read their results;
+8. revise its representation;
+9. extend the language when the existing grammar is inadequate;
+10. reparse/re-execute under the new language.
 
 ## 2.2 Initial research questions
 
@@ -81,6 +82,30 @@ Can an ambiguity-preserving parse forest serve as a useful external representati
 Can a task-specific reasoning DSL represent useful reasoning state with substantially fewer tokens than repeatedly expressing equivalent state in natural language?
 
 Token efficiency is a secondary experiment. It should not complicate the first proof of concept.
+
+## 2.3 Tool use vs constructed machinery, and grammar roles
+
+Two ways an LLM involves computation (this distinction runs through the whole project):
+
+- **Normal tool use.** The LLM invokes a *pre-existing* program — a calculator adds, a
+  solver searches, a validator checks. The program is fixed; the LLM supplies input and
+  reads output.
+- **Aristotle hypothesis.** The LLM *constructs or modifies* the program/language that
+  defines and explores the problem's computational representation, then uses the
+  resulting machine as an external reasoning/search substrate.
+
+A grammar is not one thing. Distinguish five roles, of increasing novelty:
+
+1. **Output schema** — the shape the model's output must have.
+2. **Validator** — rejects structures that violate stated constraints.
+3. **Executable procedure** — semantic actions compute results over accepted input.
+4. **Search-space representation** — delimits the set of candidate structures (valid
+   tours, valid colorings); the machine rejects invalids and preserves alternatives.
+5. **Evolving computational artifact** — the grammar is repeatedly modified by the LLM
+   as its understanding of the problem changes.
+
+Roles 4 and 5 are where the novel research direction lives; roles 1–3 are necessary but
+sit close to existing structured-output and schema-validation work.
 
 ---
 
@@ -1547,6 +1572,19 @@ persistent state, dynamically constructed machine, ambiguity + adaptive repair),
 with explicit support/falsification criteria and a competitive baseline. No
 experiments run yet.
 
+## 2026-09-07 — Reframe: constructed computational machinery and search
+
+Reframed the research direction (affects §2, §36, §37). The deepest question is now
+"can an LLM construct, execute, observe, and iteratively refine specialized
+computational machinery as part of its reasoning process?" — not "does parsing improve
+reasoning". Made the normal-tool-use vs constructed-machinery distinction explicit, and
+split "grammar" into five roles (schema, validator, executable procedure, search-space
+representation, evolving artifact). Experiments now progress E1–E6, adding E4
+(combinatorial search / iterative refinement, e.g. small TSP) — framed strictly as
+externalizing search, not making it fast — and separating E5 (ambiguity/deferred
+commitment) and E6 (runtime adaptation). E1's ceiling with gpt-oss:20b (zero ordering
+errors ≤ n=26) is recorded as a scoping result. No experiments run yet.
+
 ---
 
 # 35. Future Directions — Do Not Implement Yet
@@ -1577,50 +1615,90 @@ These are explicitly deferred until the initial interaction model has produced e
 
 # 36. Milestone 14 — Research Plan
 
-## 36.1 Core research question
+## 36.1 Core research question and framing
 
-> Can dynamically constructed generalized executable languages provide a useful
-> external computational substrate for LLM agents?
+> **Can an LLM construct, execute, observe, and iteratively refine specialized
+> computational machinery as part of its reasoning process?**
 
-We are **NOT** claiming LLMs cannot already reason. The question is narrower: can an
-LLM construct a specialized computational machine on demand, use it to process
-subsequent input, receive machine-generated context back, and modify the machine when
-its original language is inadequate?
+Explicitly **NOT** claimed: that LLMs cannot already reason; that "Marpa solves
+NP-hard problems"; or that generalized parsing eliminates exponential search. The claim
+under investigation is narrower than all three.
+
+The proposed mechanism — the LLM does not have to hold and solve the whole problem in
+its context. It can:
+
+1. construct an executable language representing the problem and/or a useful solution
+   space;
+2. generate candidate structures;
+3. have the machine efficiently reject invalid structures, preserve
+   alternatives/ambiguity where appropriate, and execute semantic computations;
+4. observe machine-generated context describing what happened;
+5. refine the language, constraints, heuristics, or candidate solutions;
+6. repeat until it reaches a satisfactory solution.
 
 ```
-LLM reasoning
-    ↓ construct language
-executable generalized grammar
-    ↓ subsequent input stream
-parse / semantic actions
-    ↓ machine-generated context
-LLM
-    ↓ resolve / extend / continue
+construct machine
+      ↓
+generate candidates ──→ executable grammar + semantic actions
+      ↑                        │
+      │            reject invalid / preserve ambiguity / compute
+      │                        ↓
+      │    machine-generated context (validity, cost, ambiguity, diagnostics)
+      │                        ↓
+      └────── refine language / constraints / candidates
 ```
 
-Marpa's generalized parsing and ambiguity matter because the language does **not**
-have to resolve every corner case before becoming useful: a broad, simple grammar can
-be correct for the normal case while ambiguity surfaces only when an actual input hits
-the ambiguous region, and the LLM can then resolve the ambiguity or modify the
-language.
+INVALID, AMBIGUOUS, semantic-action output, execution results, and grammar extension
+are all feedback channels. Generalized parsing matters because the initial language can
+be deliberately broad or underspecified: ambiguity is *unresolved computational state*
+(competing candidates), not an error.
+
+### Normal tool use vs. constructed machinery
+
+- **Normal tool use.** The LLM calls a *pre-existing* program to solve a problem — a
+  calculator adds, a solver searches, a validator checks. The program is fixed; the LLM
+  supplies input and reads output.
+- **Aristotle hypothesis.** The LLM *constructs or modifies* the program/language that
+  defines and explores the problem's computational representation, then uses the
+  resulting machine as an external reasoning/search substrate.
+
+A fixed solver already encodes the search; the open question is whether an LLM gains
+leverage by building (and evolving) the computational representation itself.
+
+### Grammar roles (what a grammar can be)
+
+1. **Output schema** — states the shape the model's output must have.
+2. **Validator** — rejects structures that violate stated constraints.
+3. **Executable procedure** — semantic actions compute results over accepted input.
+4. **Search-space representation** — delimits the set of candidate structures (valid
+   tours, valid colorings); the machine rejects invalids and preserves alternatives.
+5. **Evolving computational artifact** — the grammar is repeatedly modified by the LLM
+   as its understanding of the problem changes.
+
+Roles 4 and 5 are where the novel research direction lives; roles 1–3 are necessary but
+sit close to existing structured-output and schema-validation work.
 
 ## 36.2 Hypotheses
 
 - **H1 — Constraint enforcement.** A formal executable language can reduce malformed
-  structured output and enforce multi-step plans more reliably than unconstrained LLM
-  generation.
-- **H2 — Compact persistent state.** A compact executable representation can replace
-  some repetitive natural-language state, reducing context/token requirements while
-  preserving or improving reliability in long-running tasks.
-- **H3 — Constructed computation.** An LLM can construct a specialized executable
-  language and use that machine to perform useful computation over subsequent
-  information.
-- **H4 — Ambiguity as deferred commitment.** Generalized parsing allows useful
-  reasoning languages to remain intentionally underspecified, deferring rare conflicts
-  until runtime rather than forcing full specification up front.
-- **H5 — Runtime-driven adaptation.** When execution produces INVALID or AMBIGUOUS
-  feedback, an LLM can use that feedback to modify its constructed language and
-  continue successfully.
+  structured output and enforce plans more reliably than unconstrained generation.
+- **H2 — Compact persistent state.** A compact executable representation can retain
+  useful state or procedures more compactly/reliably than prose/context in long-running
+  tasks.
+- **H3 — Constructed computation.** An LLM will, unprompted, construct a specialized
+  executable language when it provides computational leverage, and use it to perform
+  computation that would otherwise remain in its reasoning/context.
+- **H4 — Search-space externalization.** An LLM can encode a combinatorial search
+  problem as an executable representation and use machine execution/feedback to
+  eliminate or distinguish candidates and iteratively refine its search. The claim is
+  about *externalizing* search, not making it fast.
+- **H5 — Ambiguity as deferred commitment.** Generalized parsing (which preserves
+  ambiguity) is more useful than deterministic validation when the problem
+  representation is deliberately underspecified, because it lets the LLM defer rare
+  conflicts until more information arrives.
+- **H6 — Runtime-driven adaptation.** Parser/runtime feedback (INVALID, AMBIGUOUS) can
+  cause the LLM to discover that its current language is insufficient, extend or modify
+  it, and successfully continue.
 
 ## 36.3 Shared experimental discipline
 
@@ -1652,6 +1730,16 @@ Per trial, capture as JSONL (extending the existing `/tmp/smoke-*.jsonl` discipl
 - a machine-readable "condition" tag so results can be grouped.
 
 ## 36.5 Experiment 1 — Constraint enforcement (H1)
+
+> **Scoping result (2026-09-07).** The mechanism is validated: a grammar encoding the
+> dependency DAG turns an out-of-order step into `INVALID` with `Expected:` diagnostics
+> naming the missing earlier token. But gpt-oss:20b makes *zero* ordering errors across
+> line/JSON formats up to 30 components and scrambled chains up to n=26 (deterministic
+> correct output). The A/B on ordering is therefore at ceiling with this model. This is
+> a *useful* result — it confirms the grammar enforces the constraint independently of
+> the model, and it identifies plain topological ordering as too easy for this model to
+> expose a benefit. Do **not** manufacture baseline errors or weaken the model to force
+> a positive result; treat E1 as the controlled scoping experiment.
 
 - **Task class.** Produce a structured multi-step artifact/plan with a mechanically
   checkable schema. Concrete candidate: given N components with dependencies, emit a
@@ -1743,46 +1831,117 @@ Per trial, capture as JSONL (extending the existing `/tmp/smoke-*.jsonl` discipl
 The critical question this experiment answers: *does the machine actually perform
 useful computational work, rather than merely serving as a fancy scratchpad?*
 
-## 36.8 Experiment 4 — Ambiguity and adaptive repair (H4 + H5)
+## 36.8 Experiment 4 — Combinatorial search / iterative refinement (H4)
 
-- **Task class.** Tasks with genuine ambiguity or underspecification that must be
-  resolved mid-task, plus a second phase where the initial language fails on a new
-  input type. Concrete candidate: a spec with two valid structural readings leading to
-  different downstream conclusions (precedence / dependency grouping), then a new input
-  class the grammar cannot parse.
-- **Conditions.** A = ordinary reasoning (no tools). B = ordinary structured tool use.
-  C = Aristotle, fixed grammar, ambiguity surfaced but no resolution primitive. D =
-  Aristotle full (ambiguity detection + `commit` + `extend`).
+- **Task class.** A tractable combinatorial problem. Concrete candidate: small/medium
+  Traveling Salesman Problem (e.g. 8–15 cities with a known optimal), also graph
+  coloring or job scheduling. The model's job is to find a good/valid solution against
+  a known reference.
+- **Framing caveat (read carefully).** This is **not** "beat a dedicated TSP solver",
+  and **not** "Marpa makes NP-hard problems easy." Generalized parsing eliminates
+  nothing exponential. The claim is strictly about *externalization*: can the LLM
+  encode the solution space as a grammar, and use machine execution/feedback to prune
+  and refine — rather than doing the whole search in-context?
+- **The grammar's role.** The language represents *valid* candidate structures (a tour
+  visits each city once, only defined edges) and, via semantic actions, computes a
+  candidate's cost. The machine rejects invalid candidates (`INVALID`), computes cost
+  (`output`), and preserves competing partial candidates as `AMBIGUOUS`. The LLM narrows
+  the search by extending the grammar with added constraints (e.g. "must include edge
+  A–B").
+- **Baselines.** A = direct LLM reasoning (construct a tour and cost it in-context).
+  B = ordinary code/tooling (the LLM writes a brute-force/heuristic in a code sandbox).
+  C = Aristotle: the LLM constructs the executable tour language. D (optional) = a
+  *fixed* pre-built tour validator/DSL handed to the model (isolates construction from
+  use).
 - **Model(s).** One model per run.
-- **Trials.** ≥10 ambiguous tasks.
-- **Independent variables.** Condition; task; ambiguity type (precedence vs structural
-  vs lexical).
-- **Dependent variables.** Ambiguity detected vs guessed-through (binary: did the model
-  act on `AMBIGUOUS`, or silently pick one?); resolution quality (chosen interpretation
-  correct/justified vs ground-truth intent); number of grammar modifications (D);
-  recovery rate (fraction where an initial INVALID/AMBIGUOUS led to a correct final
-  answer); tokens; tool calls; final task success.
-- **Success criteria.** D's recovery rate ≥ C's, and both ≥ baseline when tasks
-  genuinely require disambiguation; the model treats AMBIGUOUS as a signal (stops,
-  resolves, extends) rather than an error it ignores.
-- **Confounders.** Tasks that are ambiguous in name but guessable in practice (guessing
-  wrong must be costly, or the parser's signal has no value); the "guess-through"
-  tendency (a model that always picks the first interpretation ignores the signal —
-  this is exactly the falsification).
-- **Supports H4 if** ambiguity is detected and deferred, and deferring improves
-  resolution quality vs silently guessing. **Supports H5 if** after INVALID/AMBIGUOUS
-  the model modifies the grammar (`extend`) and recovers more often than pure
-  prompt-retry.
-- **Falsifies if** the model guesses through ambiguity as often as baseline (no
-  deferred-decision benefit) and/or never productively extends the grammar — ambiguity
-  is just an error condition, not a mechanism.
+- **Trials.** ≥10 distinct instances per condition.
+- **Independent variables.** Condition; instance; instance size (8 vs 15 cities).
+- **Dependent variables.** Solution quality (tour cost / gap to optimal); computation
+  externalized (share of candidate rejection and cost computation done by the machine
+  vs in-context — measured via tool calls and emitted context); tokens/context;
+  iterations; tool calls; grammar version count (evolution); machine-generated context
+  volume and use; number of INVALID/AMBIGUOUS states; whether the machine becomes
+  *more* useful as refinement proceeds (a within-run trend).
+- **Success criteria.** C reaches comparable-or-better solution quality than A while
+  demonstrably externalizing search (the machine rejects candidates and computes costs
+  that A had to hold in-context), at acceptable cost; and the machinery is refined over
+  the run rather than built once and left static.
+- **Confounders.** Construction overhead; the "passive scratchpad" failure (the LLM does
+  the search in-context and merely logs tours through the tool); instance size (too
+  small → brute-force trivial for A too; too large → C cannot finish).
+- **Supports H4 if** the machine performs real pruning/cost computation that changes
+  the LLM's subsequent choices, and solution quality vs A matches/exceeds with less
+  in-context search.
+- **Falsifies H4 if** construction is theater — the machine is a passive record, the
+  LLM still does the search in-context, and overhead dominates with no quality benefit.
 
-## 36.9 Sequencing and go/no-go gates
+## 36.9 Experiment 5 — Ambiguity / deferred commitment (H5)
 
-Run in dependency-light order: E1 and E2 first (small, cheap, controlled), then E3
-(open-ended, exploratory), then E4 (depends on `commit`/`extend` being well-exercised).
-Each experiment has a gate: if the small version shows no signal **and** no obvious
-design fix, do not scale it into a benchmark — record the null result and move on.
+- **Task class.** A problem whose representation is deliberately underspecified at the
+  start and only resolved by later information. Concrete candidate: a tour/schedule spec
+  that does not yet pin down an edge or assignment, so multiple completions are valid
+  until new evidence arrives.
+- **Framing.** The specific question is whether *generalized parsing beats deterministic
+  validation* here: a deterministic validator must reject an underspecified structure,
+  while a generalized parser can accept it as ambiguous (competing candidates) and let
+  the LLM defer the choice.
+- **Conditions.** A = ordinary reasoning. B = deterministic validation (a strict
+  grammar/validator that rejects the underspecified input). C = Aristotle generalized
+  parsing (ambiguity preserved), with `commit` to resolve later.
+- **Model(s).** One model.
+- **Trials.** ≥10.
+- **Independent variables.** Condition; task; when the underspecification resolves
+  (early vs late).
+- **Dependent variables.** Whether ambiguity is *detected and deferred* vs guessed
+  through; resolution quality (was the eventual choice consistent with the evidence);
+  tokens; tool calls; final task success.
+- **Success criteria.** C defers and then resolves *correctly* more often than A (which
+  guesses) and B (which forces an early, possibly wrong, commitment).
+- **Confounders.** Tasks that are ambiguous in name but guessable in practice (a wrong
+  guess must be costly); deterministic-vs-generalized differences must not be conflated
+  with other treatment differences.
+- **Supports H5 if** preserving ambiguity lets the LLM defer until enough evidence
+  exists, and deferral improves resolution quality over both guessing (A) and early
+  forcing (B).
+- **Falsifies H5 if** the LLM guesses through ambiguity as often as baseline, or
+  deferral yields no quality gain over deterministic early commitment.
+
+## 36.10 Experiment 6 — Runtime-driven adaptation (H6)
+
+- **Task class.** A multi-stage problem where a *later* stage introduces an input class
+  the model's initial language cannot represent. Concrete candidate: stages 1–2 are
+  well-modeled by a grammar; stage 3 introduces a new structure (a new entity type or
+  field) the grammar rejects.
+- **Framing.** A *genuine capability test*, not a scripted repair: the model is not told
+  what will break or how to fix it. It must detect insufficiency from `INVALID`/
+  `AMBIGUOUS` feedback and extend its own grammar.
+- **Conditions.** A = ordinary reasoning (re-plan in prose). B = ordinary tool use
+  (retry/regenerate) C = Aristotle (detect INVALID → extend grammar → re-execute).
+- **Model(s).** One model.
+- **Trials.** ≥10.
+- **Independent variables.** Condition; magnitude of the change (additive field vs
+  novel structure).
+- **Dependent variables.** Recovery rate (fraction where the model notices insufficiency
+  and continues successfully); grammar modifications made and whether they are *correct*
+  (capture the new structure vs special-case the failing input); tokens; tool calls;
+  final task success.
+- **Success criteria.** C recovers on the new input class more often than A/B, with
+  grammar modifications that genuinely extend the language rather than special-case the
+  input.
+- **Confounders.** The model may "fix" by constraining the input instead of extending
+  the language; the change must be genuinely unanticipated (not scripted).
+- **Supports H6 if** INVALID/AMBIGUOUS feedback triggers the LLM to extend its language
+  and continue successfully, and the extension is general rather than a special case.
+- **Falsifies H6 if** the model fails to notice insufficiency, or extends only to
+  special-case the failing input, or recovery rate ≤ baseline.
+
+## 36.11 Sequencing and go/no-go gates
+
+Run roughly in order E1→E2→E3→E4 (E4 requires the machine's cost/validity/ambiguity
+channels to be exercised). E5 and E6 depend on `commit`/`extend` and ambiguity handling
+being well-understood, and can follow E4. Each experiment has a gate: if the small
+version shows no signal **and** no obvious design fix, record the null result and move
+on. E1 is explicitly a scoping experiment whose ceiling result is already recorded.
 
 ---
 
@@ -1790,83 +1949,94 @@ design fix, do not scale it into a benchmark — record the null result and move
 
 ## 37.1 The 60-second pitch
 
-> LLMs reason in natural language — flexible, but not checkable. We're testing whether
-> an LLM can do better by building itself a small formal, *executable* language on
-> demand: a grammar plus a runtime. It constructs that machine once, feeds it later
-> input, gets machine-checked results back, and — crucially — can *change the machine*
-> when it hits something the language can't handle.
+> Most tools are fixed: an LLM calls a calculator or a solver that someone else already
+> built. Aristotle tests a different idea — that an LLM can *construct and revise its
+> own computational machinery* as part of reasoning. The model writes an executable
+> language (a grammar plus a runtime), feeds it candidates, and reads back machine
+> feedback: what's invalid, what's ambiguous, what a candidate costs. When the language
+> is wrong or too narrow, the model changes it and re-runs.
 >
-> The twist is the parser is *generalized*, so it preserves ambiguity instead of
-> rejecting it. The language doesn't have to nail down every edge case up front: you
-> leave the rare conflicts unresolved, and only when a real input actually hits one
-> does the ambiguity surface — and then the LLM resolves it or extends the language.
+> The interesting case isn't simple constraint-checking — it's search. An LLM can
+> represent the solution space of a hard combinatorial problem as a grammar, generate
+> candidates, and let the machine reject the invalid ones, preserve competing
+> alternatives, and compute results — refining the machine as it learns. The parser
+> doesn't make the search faster; it makes the model's own search machine-checked and
+> external.
 >
-> We've built the machinery — construct, execute, detect ambiguity, commit to a choice,
-> extend the grammar — and verified it end to end. What we have *not* shown is that any
-> of this measurably helps an LLM do a real task better than ordinary reasoning and
-> ordinary tools. That's the experiment.
+> We've built the machinery and verified it end to end. What we have not shown is that
+> any of this measurably helps on a real task. That's the experiment.
 
 ## 37.2 One-page explanation
 
 1. **The problem.** LLM reasoning lives in natural language: expressive but
-   unstructured, hard to validate, and — over long tasks — token-hungry and
-   drift-prone. Errors are only caught when the model (or a human) happens to re-read
-   the output.
+   unstructured, hard to validate, and — over long or hard tasks — token-hungry and
+   drift-prone. Errors (including in its own reasoning process) are caught only when the
+   model happens to re-read its output.
 
-2. **The core idea.** Let the LLM externalize part of its reasoning as a *formal,
-   executable language* it designs itself — a grammar plus a runtime — and use that
-   machine to process subsequent input with guaranteed, deterministic checking.
+2. **The core idea.** Let the LLM externalize part of its reasoning as *formal,
+   executable machinery it designs itself* — a grammar plus a runtime — and use that
+   machine to process candidates with guaranteed, deterministic checking and
+   computation.
 
-3. **How it differs from ordinary tool use.** Ordinary tools are fixed: a calculator
-   adds, a shell runs commands, a file stores bytes. Here the *language itself is the
-   tool the model builds* — its vocabulary, structure, and effects are defined by the
-   model for the task at hand, then enforced deterministically. It's not "call a fixed
-   function"; it's "define and compile a small machine".
+3. **How it differs from ordinary tool use (the key distinction).** Ordinary tools are
+   fixed: the LLM *calls* a pre-existing program. Aristotle's hypothesis is that the LLM
+   *constructs or modifies the program itself* — the language that defines and explores
+   the problem's representation — then uses the resulting machine as a substrate. Not
+   "call a fixed function"; "define and compile a small machine."
 
 4. **Why generalized parsing / Marpa.** A conventional parser rejects anything not in
-   the grammar; a *generalized* parser (Earley/Marpa) preserves *all* parses and reports
-   ambiguity as data. That lets the language be intentionally loose and still useful.
+   the grammar; a *generalized* parser preserves *all* parses and reports ambiguity as
+   data. That lets the language be intentionally broad/underspecified and still useful —
+   ambiguity becomes *unresolved computational state*, not an error.
 
 5. **Why dynamically constructed languages matter.** A fixed grammar must be specified
    in advance by someone else. Here the model builds the language when it needs it and
    evolves it as the task unfolds — the grammar is *state*, not configuration.
 
-6. **Why ambiguity can be a feature, not a failure.** Ambiguity means "multiple
-   structural interpretations exist" — deferred commitment. The model doesn't have to
-   pre-resolve every conflict; it can defer until a real input hits the ambiguous
-   region, then resolve or refine. Underspecification becomes a strategy, not a bug.
+6. **Why ambiguity can be a feature.** Ambiguity means competing structures are
+   preserved. The model can defer choices until evidence arrives, and narrow the
+   language by adding constraints. Underspecification is a strategy, not a bug.
 
 7. **Practical utility cases.** (a) enforcing schemas; (b) validating multi-step plans;
    (c) compact persistent state across long tasks; (d) token reduction via dense
-   grammars/DSLs; (e) reusable executable procedures the model writes once and runs
-   many times.
+   grammars/DSLs; (e) reusable executable procedures; and (f) *representing a search
+   space* — a grammar delineating valid candidate structures that the machine rejects
+   or preserves.
 
-8. **The deeper hypothesis.** That externalized, executable, *machine-checked*
-   reasoning is a useful computational substrate for LLM agents — a different point on
-   the spectrum between pure natural-language reasoning and fixed, pre-built tooling.
+8. **The deeper question.** Not "does parsing improve reasoning?", but: *can an LLM
+   construct, execute, observe, and iteratively refine specialized computational
+   machinery as part of its reasoning process?* Most provocatively, can it externalize
+   part of a combinatorial search — building the representation it searches with, not
+   merely calling a solver?
 
 9. **What Aristotle currently demonstrates (built, not yet proven useful).**
    End-to-end infrastructure: construct a versioned grammar; execute independent input
    streams with a fixed semantic-action vocabulary (`store`/`add`/`print`/`emit`);
    detect and enumerate ambiguity; `commit` to one interpretation; `extend` the grammar
-   after failure; `fork` diverging hypotheses. All of it is deterministic, tested, and
-   smoke-verified through omp.
+   after failure; `fork` diverging hypotheses. All deterministic, tested, smoke-verified
+   through omp.
 
-10. **What remains to be experimentally established.** That any of the above produces
-    a *measurable* benefit over a competitive baseline for a real task. This is
-    unproven. The M14 plan (§36) specifies four experiments (H1–H5) with explicit
-    support/falsification criteria.
+10. **What remains to be experimentally established.** That any of this produces a
+    *measurable* benefit over a competitive baseline. This is unproven. The research
+    plan (§36) now specifies six experiments (E1–E6) with explicit support/falsification
+    criteria. E1's ordering constraint is already at ceiling with gpt-oss:20b (which
+    makes zero ordering errors ≤ n=26) — that ceiling is itself a recorded result.
 
 ## 37.3 Claim discipline (what each assertion is)
 
 | Statement | Status |
 |---|---|
 | Grammar construction, execution, ambiguity, commit, extend, fork work end to end | **Demonstrated** (tests + smoke, M0–M13) |
-| Emitted context is returned to the LLM and can be incorporated into reasoning | **Demonstrated** (S5; a manual multi-loop run used it) |
-| The machine performs *useful* computation that changes outcomes vs baselines | **Hypothesis (unproven)** — H3, Experiment 3 |
-| Executable languages reduce malformed output / enforce plans | **Hypothesis (unproven)** — H1, Experiment 1 |
-| Compact DSL state reduces tokens without losing accuracy | **Hypothesis (unproven)** — H2, Experiment 2 |
-| Ambiguity is a useful deferred-decision mechanism, not an error | **Hypothesis (unproven)** — H4/H5, Experiment 4 |
+| A grammar encoding a DAG catches ordering violations (`INVALID` + `Expected:` diagnostics) | **Demonstrated** (E1 mechanism validation) |
+| gpt-oss:20b makes zero ordering errors on topological sort (≤ n=26 chains, ≤ 30 comps) | **Demonstrated** (E1 calibration) — a ceiling, recorded |
+| The machine performs *useful* computation that changes outcomes vs baselines | **Hypothesis (unproven)** — H3 |
+| Executable languages reduce malformed output / enforce plans | **Hypothesis (unproven)** — H1 (ceiling with this model) |
+| Compact DSL state reduces tokens without losing accuracy | **Hypothesis (unproven)** — H2 |
+| The LLM externalizes a combinatorial search into the machine with a quality benefit | **Hypothesis (unproven)** — H4 |
+| Generalized parsing beats deterministic validation for deferred commitment | **Hypothesis (unproven)** — H5 |
+| INVALID/AMBIGUOUS feedback drives general (non-special-cased) language extension | **Hypothesis (unproven)** — H6 |
 | Aristotle improves an LLM agent on a real task | **Unproven** |
 
-Do not cite any "unproven" row as established.
+Do not cite any "unproven" row as established. In particular, no mention of NP-hard
+problems, TSP, or search should imply that Marpa makes hard search easy — the claim is
+about *externalizing* search, never about eliminating its cost.
