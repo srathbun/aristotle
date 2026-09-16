@@ -1585,6 +1585,30 @@ externalizing search, not making it fast — and separating E5 (ambiguity/deferr
 commitment) and E6 (runtime adaptation). E1's ceiling with gpt-oss:20b (zero ordering
 errors ≤ n=26) is recorded as a scoping result. No experiments run yet.
 
+## 2026-09-07 — E2 small-scale result (H2 falsified at small scale)
+
+Ran E2 (compact persistent state) at small scale: a 9-task state over 7 turns on
+gpt-oss:20b. Tool-free prose (A) used 1,745 tokens and was 9/9 accurate; the Aristotle
+DSL (C) used 16,905–25,504 tokens and was 7/9–9/9 accurate — ~10–15× more tokens with
+no accuracy benefit. H2 is falsified at small scale (prose is already compact and
+reliable; the DSL's fixed overhead dominates). Confounder found and fixed: an
+unconstrained prose model spontaneously used file tools and lost 8/9 tasks. Next: a
+scale probe with a constrained context window to locate the crossover where the DSL
+might overtake prose.
+
+## 2026-09-07 — E2 scale probe (no clean crossover; verbosity dominates)
+
+Scale probe: 50 items over 7 turns, context constrained to 2K and 4K (derived gpt-oss
+variants). At both sizes both prose and DSL collapsed into task amnesia (0/51 items
+retained, generic "how can I help you?" replies) — the window was below the task's own
+footprint (grammar + init + model verbosity). At 4K the DSL was ~2.5× more
+token-efficient than prose (22,784 vs 57,709), so its compactness is real and
+directionally supports H2, but both exceeded the window. Conclusion: the
+"context-window crossover" does not materialize cleanly — model verbosity dominates the
+state-representation difference, and a window small enough to bind prose also binds the
+DSL. H2 remains falsified at small scale and unproven (with a real but sub-dominant
+token advantage) at scale.
+
 ---
 
 # 35. Future Directions — Do Not Implement Yet
@@ -1772,6 +1796,25 @@ Per trial, capture as JSONL (extending the existing `/tmp/smoke-*.jsonl` discipl
   schema), or C's cost exceeds its benefit.
 
 ## 36.6 Experiment 2 — Compact persistent state (H2)
+
+> **Result at small scale (2026-09-07).** A 9-task state tracked over 7 turns on
+> gpt-oss:20b. Tool-free prose (A) used **1,745 tokens and was 9/9 accurate**. The
+> Aristotle DSL (C) used **16,905–25,504 tokens and was 7/9–9/9 accurate** — ~10–15×
+> more tokens with no accuracy benefit. **H2 is falsified at small scale**: prose is
+> already compact and reliable, and the DSL's fixed overhead (grammar construction +
+> tool-call machinery) dwarfs its per-item compactness. Pilot note: an *unconstrained*
+> prose model spontaneously reached for file tools and catastrophically lost 8/9 tasks
+> — an artifact of tool misuse, not of prose per se.
+>
+> **Scale probe (2026-09-07).** 50 items over 7 turns, with the model context
+> artificially constrained (`num_ctx` 2048 and 4096 variants of gpt-oss:20b). At both
+> sizes **both conditions collapsed into task amnesia** (final replies were generic
+> "how can I help you?"), 0/51 items retained — the window was smaller than the task's
+> own footprint (grammar + init + model verbosity). At 4K the DSL was ~2.5× more
+> token-efficient than prose (22,784 vs 57,709 tokens) — its compactness is *real* and
+> directionally supports H2 — but both exceeded the window. **No clean "DSL succeeds,
+> prose forgets" crossover**: a window small enough to bind prose also binds the DSL,
+> because model verbosity dominates the state-representation difference.
 
 - **Task class.** Long-running stateful task where state is repeatedly updated and
   consulted. Concrete candidate: a multi-turn tracker (e.g. project task board) over
