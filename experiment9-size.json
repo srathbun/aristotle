@@ -1,0 +1,142 @@
+{
+  "formula_verification": [
+    {
+      "n": 10,
+      "m": 15,
+      "seed": 7,
+      "recorded_states": 4754,
+      "formula_states": 4754,
+      "match": true
+    },
+    {
+      "n": 12,
+      "m": 20,
+      "seed": 8,
+      "recorded_states": 29042,
+      "formula_states": 29042,
+      "match": true
+    },
+    {
+      "n": 14,
+      "m": 20,
+      "seed": 9,
+      "recorded_states": 41634,
+      "formula_states": 41634,
+      "match": true
+    },
+    {
+      "n": 16,
+      "m": 25,
+      "seed": 10,
+      "recorded_states": 299490,
+      "formula_states": 299490,
+      "match": true
+    },
+    {
+      "n": 18,
+      "m": 30,
+      "seed": 11,
+      "recorded_states": 245602,
+      "formula_states": 245602,
+      "match": true
+    },
+    {
+      "n": 20,
+      "m": 35,
+      "seed": 12,
+      "recorded_states": 5091682,
+      "formula_states": 5091682,
+      "match": true
+    },
+    {
+      "n": 24,
+      "m": 40,
+      "seed": 12,
+      "recorded_states": 5002178,
+      "formula_states": 5002178,
+      "match": true
+    },
+    {
+      "n": 6,
+      "m": 9,
+      "seed": 101,
+      "recorded_states": 226,
+      "formula_states": 226,
+      "match": true
+    },
+    {
+      "n": 7,
+      "m": 11,
+      "seed": 202,
+      "recorded_states": 350,
+      "formula_states": 350,
+      "match": true
+    },
+    {
+      "n": 8,
+      "m": 16,
+      "seed": 303,
+      "recorded_states": 2306,
+      "formula_states": 2306,
+      "match": true
+    }
+  ],
+  "fixed_n4": [
+    {
+      "m": 2,
+      "formula_states": 6,
+      "per_boundary_bound_16": 48,
+      "width": 2
+    },
+    {
+      "m": 4,
+      "formula_states": 26,
+      "per_boundary_bound_16": 80,
+      "width": 3
+    },
+    {
+      "m": 8,
+      "formula_states": 98,
+      "per_boundary_bound_16": 144,
+      "width": 4
+    },
+    {
+      "m": 16,
+      "formula_states": 210,
+      "per_boundary_bound_16": 272,
+      "width": 4
+    },
+    {
+      "m": 32,
+      "formula_states": 482,
+      "per_boundary_bound_16": 528,
+      "width": 4
+    },
+    {
+      "m": 64,
+      "formula_states": 978,
+      "per_boundary_bound_16": 1040,
+      "width": 4
+    }
+  ],
+  "ordering_heuristic": [
+    {
+      "n": 16,
+      "m": 25,
+      "width_clause_order": 15,
+      "width_minfill": 8
+    },
+    {
+      "n": 20,
+      "m": 35,
+      "width_clause_order": 19,
+      "width_minfill": 10
+    },
+    {
+      "n": 24,
+      "m": 40,
+      "width_clause_order": 19,
+      "width_minfill": 9
+    }
+  ]
+}

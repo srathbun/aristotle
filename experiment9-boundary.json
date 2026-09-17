@@ -1,0 +1,80 @@
+{
+  "instance": {
+    "n": 3,
+    "m": 4,
+    "seed": 909,
+    "clauses": [
+      [
+        1,
+        -2,
+        3
+      ],
+      [
+        2,
+        -3,
+        -1
+      ],
+      [
+        -3,
+        1,
+        2
+      ],
+      [
+        -3,
+        -1,
+        2
+      ]
+    ]
+  },
+  "grammar_lines": 58,
+  "grammar_bytes": 1165,
+  "per_boundary": [
+    {
+      "cut": 0,
+      "width": 0,
+      "crossing_vars": "-",
+      "state_nonterminals": 1,
+      "expected_2^width": 1,
+      "transition_rules": 7,
+      "match": true
+    },
+    {
+      "cut": 1,
+      "width": 3,
+      "crossing_vars": "123",
+      "state_nonterminals": 8,
+      "expected_2^width": 8,
+      "transition_rules": 7,
+      "match": true
+    },
+    {
+      "cut": 2,
+      "width": 3,
+      "crossing_vars": "123",
+      "state_nonterminals": 8,
+      "expected_2^width": 8,
+      "transition_rules": 7,
+      "match": true
+    },
+    {
+      "cut": 3,
+      "width": 3,
+      "crossing_vars": "123",
+      "state_nonterminals": 8,
+      "expected_2^width": 8,
+      "transition_rules": 7,
+      "match": true
+    },
+    {
+      "cut": 4,
+      "width": 0,
+      "crossing_vars": "-",
+      "state_nonterminals": 1,
+      "expected_2^width": 1,
+      "transition_rules": 0,
+      "match": true
+    }
+  ],
+  "total_states": 26,
+  "all_match": true
+}

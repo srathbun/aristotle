@@ -1,0 +1,30 @@
+[
+  {
+    "after_call": 0,
+    "observation_and_decision": "Read Aristotle tool docs and Cook's Clay Mathematics Institute formulation of P versus NP. Decision: investigate a concrete, falsifiable route (SAT reduced to context-free parsing) rather than attempt a general proof; obligations stated before construction: (1) SAT iff complete parse exists, (2) polynomial-time construction with polynomial-size grammar and input, (3) polynomial recognition without enumerating parses."
+  },
+  {
+    "after_call": 4,
+    "observation_and_decision": "Naive per-clause grammar accepted x AND NOT x (call 2, VALID with 1 parse); frontier grammar retaining shared-variable assignments rejected it (call 4, INVALID). Decision: shared-variable consistency requires carrying partial assignments across clause boundaries; verify the exact encoding on a case where models are countable by brute force."
+  },
+  {
+    "after_call": 20,
+    "observation_and_decision": "Two-variable cohort: parse counts (3, 2, 1, 0) matched model-set sizes for clause prefixes of (x OR y), (NOT x OR y), (x OR NOT y), (NOT x OR NOT y), and returned structures disambiguated the masked assignment tokens. Decision: encoding is correct at n=2; proceed to size scaling, the actual proof obligation."
+  },
+  {
+    "after_call": 23,
+    "observation_and_decision": "Harness indexing bug aborted the first cohort loop after two calls; parse-on-empty-fragments returned the epsilon string (0 parses) and cannot count models. Decision: count models via the execute forest instead; wasted calls remain in the log."
+  },
+  {
+    "after_call": 29,
+    "observation_and_decision": "Cohort correctness verified: Aristotle forest counts 23/25/22 equal brute-force model counts on three random 3-CNF instances (n=6,7,8). Scaling metrics show grammar size growing exponentially with variable frontier width: n=8 118 KB, n=12 1.9 MB, n=20 426 MB. Decision: no further scattered instances; derive the exact size formula and test whether any representation trick avoids the exponential."
+  },
+  {
+    "after_call": 29,
+    "observation_and_decision": "Kernel killed by too-tight timeout while rebuilding large grammars; switched to verifying the formula against saved measurements instead of regenerating 400 MB grammar strings. Formula |G| = sum over cut positions of 2^(number of variables crossing the cut) verified exactly on all 13 recorded instances."
+  },
+  {
+    "after_call": 29,
+    "observation_and_decision": "Negative result established for this route: grammar size is 2^O(treewidth); min-fill ordering reduces the exponent (8-10 on tested instances versus 15-19 in clause order) but treewidth of 3-CNF is unbounded, so no polynomial-size construction exists in this family. Obligation 2 fails for general 3-SAT. This rules out the proposed construction family, not P=NP itself. Report the negative result; stop."
+  }
+]

@@ -1,0 +1,299 @@
+{
+  "candidate": {
+    "trial": 0,
+    "base": [
+      [
+        -6,
+        5,
+        2
+      ],
+      [
+        4,
+        -2,
+        -5
+      ],
+      [
+        6,
+        -5,
+        3
+      ],
+      [
+        -4,
+        -5,
+        3
+      ],
+      [
+        -6,
+        -2,
+        -5
+      ],
+      [
+        -4,
+        -1,
+        -5
+      ]
+    ],
+    "extra": [
+      5,
+      -6,
+      -1
+    ],
+    "signature": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "initial_probes": [
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      1,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      1,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      1,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      1,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      1,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      1
+    ]
+  ],
+  "first_machine_witnesses": [
+    [
+      1,
+      1,
+      0,
+      1,
+      0,
+      1
+    ],
+    [
+      1,
+      1,
+      0,
+      0,
+      0,
+      1
+    ],
+    [
+      1,
+      1,
+      1,
+      1,
+      0,
+      1
+    ],
+    [
+      1,
+      1,
+      1,
+      0,
+      0,
+      1
+    ]
+  ],
+  "first_scores": [
+    {
+      "witness": [
+        1,
+        1,
+        0,
+        1,
+        0,
+        1
+      ],
+      "refuted_guesses": 17
+    },
+    {
+      "witness": [
+        1,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "refuted_guesses": 13
+    },
+    {
+      "witness": [
+        1,
+        1,
+        1,
+        1,
+        0,
+        1
+      ],
+      "refuted_guesses": 20
+    },
+    {
+      "witness": [
+        1,
+        1,
+        1,
+        0,
+        0,
+        1
+      ],
+      "refuted_guesses": 17
+    }
+  ],
+  "first_selected": [
+    1,
+    1,
+    1,
+    1,
+    0,
+    1
+  ],
+  "second_clause": [
+    -1,
+    -2,
+    3
+  ],
+  "second_machine_witnesses": [
+    [
+      1,
+      1,
+      0,
+      1,
+      0,
+      0
+    ],
+    [
+      1,
+      1,
+      0,
+      1,
+      0,
+      1
+    ],
+    [
+      1,
+      1,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      1,
+      1,
+      0,
+      0,
+      0,
+      1
+    ]
+  ],
+  "second_scores": [
+    {
+      "witness": [
+        1,
+        1,
+        0,
+        1,
+        0,
+        0
+      ],
+      "refuted_guesses": 6
+    },
+    {
+      "witness": [
+        1,
+        1,
+        0,
+        1,
+        0,
+        1
+      ],
+      "refuted_guesses": 7
+    },
+    {
+      "witness": [
+        1,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "refuted_guesses": 3
+    },
+    {
+      "witness": [
+        1,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "refuted_guesses": 9
+    }
+  ],
+  "second_selected": [
+    1,
+    1,
+    0,
+    0,
+    0,
+    1
+  ],
+  "counts": {
+    "all_guesses": 160,
+    "after_initial_probes": 100,
+    "after_first_probe": 80,
+    "after_second_probe": 71,
+    "actually_equivalent_exhaustive": 8
+  },
+  "aristotle_calls": 14,
+  "independent_witness_verification": "exact set equality over all 64 continuations"
+}
