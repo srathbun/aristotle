@@ -1,0 +1,80 @@
+[
+  {
+    "length": 1,
+    "words": 3,
+    "worst_minimum_register_histogram": {
+      "1": 3
+    },
+    "first_needing_four": null
+  },
+  {
+    "length": 2,
+    "words": 9,
+    "worst_minimum_register_histogram": {
+      "2": 9
+    },
+    "first_needing_four": null
+  },
+  {
+    "length": 3,
+    "words": 27,
+    "worst_minimum_register_histogram": {
+      "2": 27
+    },
+    "first_needing_four": null
+  },
+  {
+    "length": 4,
+    "words": 81,
+    "worst_minimum_register_histogram": {
+      "2": 63,
+      "3": 18
+    },
+    "first_needing_four": null
+  },
+  {
+    "length": 5,
+    "words": 243,
+    "worst_minimum_register_histogram": {
+      "2": 219,
+      "3": 24
+    },
+    "first_needing_four": null
+  },
+  {
+    "length": 6,
+    "words": 729,
+    "worst_minimum_register_histogram": {
+      "2": 717,
+      "3": 12
+    },
+    "first_needing_four": null
+  },
+  {
+    "length": 7,
+    "words": 2187,
+    "worst_minimum_register_histogram": {
+      "2": 2181,
+      "3": 6
+    },
+    "first_needing_four": null
+  },
+  {
+    "length": 8,
+    "words": 6561,
+    "worst_minimum_register_histogram": {
+      "2": 6555,
+      "3": 6
+    },
+    "first_needing_four": null
+  },
+  {
+    "length": 9,
+    "words": 19683,
+    "worst_minimum_register_histogram": {
+      "2": 19677,
+      "3": 6
+    },
+    "first_needing_four": null
+  }
+]

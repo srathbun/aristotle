@@ -137,6 +137,30 @@ test("unrecognized fragment yields INVALID with non-empty error", async () => {
   assert.ok(typeof r.error === "string" && r.error.length > 0);
 });
 
+test("incomplete input has no complete parse and cannot execute effects", async () => {
+  const grammar = [
+    ":default ::= action => ::array",
+    ":start ::= program",
+    "program ::= prefix 'end'",
+    "prefix ::= 'begin' action => emit",
+    ":discard ~ whitespace",
+    "whitespace ~ [\\s]+",
+  ].join("\n");
+  const { state_id } = await worker.request({ op: "create", grammar });
+  await worker.request({ op: "add", state_id, fragment: "begin" });
+  const parsed = await worker.request({ op: "parse", state_id });
+  const executed = await worker.request({ op: "execute", state_id, input: "begin" });
+  for (const result of [parsed, executed]) {
+    assert.equal(result.status, "INVALID");
+    assert.equal(result.value_count, 0);
+    assert.ok(typeof result.error === "string" && result.error.length > 0);
+  }
+  assert.deepEqual(executed.emitted, []);
+  const complete = await worker.request({ op: "execute", state_id, input: "begin end" });
+  assert.equal(complete.status, "VALID");
+  assert.deepEqual(complete.emitted, ["begin"]);
+});
+
 test("extend with bad grammar returns GRAMMAR_ERROR and leaves state intact", async () => {
   await worker.request({ op: "create", state_id: "ext1", grammar: dependencyGrammar });
   await worker.request({ op: "add", state_id: "ext1", fragment: "fact(A)" });

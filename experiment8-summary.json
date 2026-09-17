@@ -1,0 +1,110 @@
+{
+  "aristotle_calls": 143,
+  "operations": {
+    "create": 2,
+    "add": 1,
+    "parse": 1,
+    "fork": 1,
+    "extend": 2,
+    "execute": 136
+  },
+  "parse_execute_statuses": {
+    "AMBIGUOUS": 116,
+    "VALID": 21
+  },
+  "zero_count_VALID_calls": [
+    12,
+    17,
+    23,
+    54,
+    63,
+    66,
+    73,
+    76
+  ],
+  "scale_checks": [
+    {
+      "call": 138,
+      "actual": 19475,
+      "expected": 19475,
+      "matches": true
+    },
+    {
+      "call": 139,
+      "actual": 19882,
+      "expected": 19882,
+      "matches": true
+    },
+    {
+      "call": 140,
+      "actual": 19429,
+      "expected": 19429,
+      "matches": true
+    },
+    {
+      "call": 141,
+      "actual": 18012,
+      "expected": 18012,
+      "matches": true
+    },
+    {
+      "call": 142,
+      "actual": 18305,
+      "expected": 18305,
+      "matches": true
+    },
+    {
+      "call": 143,
+      "actual": 18003,
+      "expected": 18003,
+      "matches": true
+    }
+  ],
+  "five_tree_values_0011": [
+    0,
+    1,
+    2,
+    0,
+    1
+  ],
+  "exhaustive_words": 29523,
+  "exceptional_words_length9": [
+    {
+      "word": "011111110",
+      "lost": [
+        2
+      ]
+    },
+    {
+      "word": "022222220",
+      "lost": [
+        1
+      ]
+    },
+    {
+      "word": "100000001",
+      "lost": [
+        2
+      ]
+    },
+    {
+      "word": "122222221",
+      "lost": [
+        0
+      ]
+    },
+    {
+      "word": "200000002",
+      "lost": [
+        1
+      ]
+    },
+    {
+      "word": "211111112",
+      "lost": [
+        0
+      ]
+    }
+  ],
+  "total_aristotle_call_wall_seconds": 7.759918212890625
+}

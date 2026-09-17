@@ -1,0 +1,497 @@
+{
+  "seed": 17092026,
+  "results": [
+    {
+      "word": "2002",
+      "unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "two_register": [
+        0,
+        2
+      ],
+      "reference_unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "reference_two_register": [
+        0,
+        2
+      ],
+      "agrees_with_reference": true,
+      "lost_values": [
+        1
+      ]
+    },
+    {
+      "word": "21122",
+      "unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "two_register": [
+        0,
+        2
+      ],
+      "reference_unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "reference_two_register": [
+        0,
+        2
+      ],
+      "agrees_with_reference": true,
+      "lost_values": [
+        1
+      ]
+    },
+    {
+      "word": "020221",
+      "unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "two_register": [
+        0,
+        1,
+        2
+      ],
+      "reference_unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "reference_two_register": [
+        0,
+        1,
+        2
+      ],
+      "agrees_with_reference": true,
+      "lost_values": []
+    },
+    {
+      "word": "2010100",
+      "unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "two_register": [
+        0,
+        1,
+        2
+      ],
+      "reference_unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "reference_two_register": [
+        0,
+        1,
+        2
+      ],
+      "agrees_with_reference": true,
+      "lost_values": []
+    },
+    {
+      "word": "01201221",
+      "unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "two_register": [
+        0,
+        1,
+        2
+      ],
+      "reference_unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "reference_two_register": [
+        0,
+        1,
+        2
+      ],
+      "agrees_with_reference": true,
+      "lost_values": []
+    },
+    {
+      "word": "2100",
+      "unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "two_register": [
+        0,
+        1,
+        2
+      ],
+      "reference_unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "reference_two_register": [
+        0,
+        1,
+        2
+      ],
+      "agrees_with_reference": true,
+      "lost_values": []
+    },
+    {
+      "word": "02020",
+      "unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "two_register": [
+        0,
+        1
+      ],
+      "reference_unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "reference_two_register": [
+        0,
+        1
+      ],
+      "agrees_with_reference": true,
+      "lost_values": [
+        2
+      ]
+    },
+    {
+      "word": "001102",
+      "unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "two_register": [
+        0,
+        1,
+        2
+      ],
+      "reference_unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "reference_two_register": [
+        0,
+        1,
+        2
+      ],
+      "agrees_with_reference": true,
+      "lost_values": []
+    },
+    {
+      "word": "2222122",
+      "unrestricted": [
+        0,
+        1
+      ],
+      "two_register": [
+        0,
+        1
+      ],
+      "reference_unrestricted": [
+        0,
+        1
+      ],
+      "reference_two_register": [
+        0,
+        1
+      ],
+      "agrees_with_reference": true,
+      "lost_values": []
+    },
+    {
+      "word": "01210122",
+      "unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "two_register": [
+        0,
+        1,
+        2
+      ],
+      "reference_unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "reference_two_register": [
+        0,
+        1,
+        2
+      ],
+      "agrees_with_reference": true,
+      "lost_values": []
+    },
+    {
+      "word": "1000",
+      "unrestricted": [
+        1,
+        2
+      ],
+      "two_register": [
+        1,
+        2
+      ],
+      "reference_unrestricted": [
+        1,
+        2
+      ],
+      "reference_two_register": [
+        1,
+        2
+      ],
+      "agrees_with_reference": true,
+      "lost_values": []
+    },
+    {
+      "word": "00211",
+      "unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "two_register": [
+        0,
+        1,
+        2
+      ],
+      "reference_unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "reference_two_register": [
+        0,
+        1,
+        2
+      ],
+      "agrees_with_reference": true,
+      "lost_values": []
+    },
+    {
+      "word": "012020",
+      "unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "two_register": [
+        0,
+        1,
+        2
+      ],
+      "reference_unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "reference_two_register": [
+        0,
+        1,
+        2
+      ],
+      "agrees_with_reference": true,
+      "lost_values": []
+    },
+    {
+      "word": "0211200",
+      "unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "two_register": [
+        0,
+        1,
+        2
+      ],
+      "reference_unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "reference_two_register": [
+        0,
+        1,
+        2
+      ],
+      "agrees_with_reference": true,
+      "lost_values": []
+    },
+    {
+      "word": "01202122",
+      "unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "two_register": [
+        0,
+        1,
+        2
+      ],
+      "reference_unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "reference_two_register": [
+        0,
+        1,
+        2
+      ],
+      "agrees_with_reference": true,
+      "lost_values": []
+    },
+    {
+      "word": "0102",
+      "unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "two_register": [
+        0,
+        1,
+        2
+      ],
+      "reference_unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "reference_two_register": [
+        0,
+        1,
+        2
+      ],
+      "agrees_with_reference": true,
+      "lost_values": []
+    },
+    {
+      "word": "10012",
+      "unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "two_register": [
+        0,
+        1,
+        2
+      ],
+      "reference_unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "reference_two_register": [
+        0,
+        1,
+        2
+      ],
+      "agrees_with_reference": true,
+      "lost_values": []
+    },
+    {
+      "word": "111210",
+      "unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "two_register": [
+        0,
+        1,
+        2
+      ],
+      "reference_unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "reference_two_register": [
+        0,
+        1,
+        2
+      ],
+      "agrees_with_reference": true,
+      "lost_values": []
+    },
+    {
+      "word": "0221012",
+      "unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "two_register": [
+        0,
+        1,
+        2
+      ],
+      "reference_unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "reference_two_register": [
+        0,
+        1,
+        2
+      ],
+      "agrees_with_reference": true,
+      "lost_values": []
+    },
+    {
+      "word": "00122000",
+      "unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "two_register": [
+        0,
+        1,
+        2
+      ],
+      "reference_unrestricted": [
+        0,
+        1,
+        2
+      ],
+      "reference_two_register": [
+        0,
+        1,
+        2
+      ],
+      "agrees_with_reference": true,
+      "lost_values": []
+    }
+  ]
+}

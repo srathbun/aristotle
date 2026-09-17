@@ -124,8 +124,8 @@ sub enumerate_values {
         }
         1;
     };
-    if (!$ok) {
-        $error  = clean_error($@);
+    if (!$ok || $value_count == 0) {
+        $error  = !$ok ? clean_error($@) : "Input has no complete parse";
         $status = "INVALID";
         # Expected productions at the failure point (readable dotted rules), so the
         # caller can act on the failure (extend the grammar) rather than just see an error.
