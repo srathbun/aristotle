@@ -954,10 +954,12 @@ result changes appropriately
 
 > **Reconciled 2026-09-07.** The list below (M0–M7) predates the executable-language
 > reframe. The authoritative roadmap is the revised list in §34 (Research Record):
-> M0–M8 complete, M9–M13 complete, M14 (research experiments and baselines) planned
-> in §36. This section is retained as the original design record. Mapping: original M6
-> (Ruby Slippers) → revised M12 (recorded not-justified); original M7 (first research
-> experiment) → revised M14.
+> M0–M13 complete; M14 (research experiments) partially complete — E1 (constraint
+> enforcement), E2 (compact state), E4 (search externalization), and E5 (ambiguity /
+> deferred commitment) run with results; E3 (constructed computation) and E6
+> (runtime-driven adaptation) pending. This section is retained as the original design
+> record. Mapping: original M6 (Ruby Slippers) → revised M12 (recorded not-justified);
+> original M7 (first research experiment) → revised M14.
 
 ## Milestone 0 — Environment verification
 
@@ -1320,25 +1322,25 @@ The parser is a representation engine, not an authority that makes real-world cl
 
 The proof of concept is complete when all of the following are true:
 
-- [ ] omp loads the extension on Windows.
-- [ ] The extension registers an LLM-callable `reason` tool.
-- [ ] The extension can start a persistent Marpa worker.
-- [ ] The worker can create a grammar.
-- [ ] The worker can accept reasoning fragments.
-- [ ] The worker can parse accumulated fragments.
-- [ ] The worker can report an unambiguous result.
-- [ ] The worker can report an ambiguous result.
-- [ ] The LLM can inspect the competing interpretations.
-- [ ] Grammar v1 can be replaced by grammar v2.
-- [ ] Existing reasoning fragments can be reparsed under v2.
-- [ ] Old grammar versions remain recoverable.
-- [ ] The extension can reconstruct state after session restart.
-- [ ] The repository has automated tests for the worker protocol.
-- [ ] The repository has an omp integration smoke test.
-- [ ] A single documented install command can replace an older local installation.
-- [ ] A single documented test command verifies the installation.
-- [ ] At least one experiment demonstrates the model responding to parser ambiguity.
-- [ ] The experiment logs enough information to reproduce the behavior.
+- [x] omp loads the extension on Windows.
+- [x] The extension registers an LLM-callable `reason` tool.
+- [x] The extension can start a persistent Marpa worker.
+- [x] The worker can create a grammar.
+- [x] The worker can accept reasoning fragments.
+- [x] The worker can parse accumulated fragments.
+- [x] The worker can report an unambiguous result.
+- [x] The worker can report an ambiguous result.
+- [x] The LLM can inspect the competing interpretations.
+- [x] Grammar v1 can be replaced by grammar v2.
+- [x] Existing reasoning fragments can be reparsed under v2.
+- [x] Old grammar versions remain recoverable.
+- [x] The extension can reconstruct state after session restart.
+- [x] The repository has automated tests for the worker protocol.
+- [x] The repository has an omp integration smoke test.
+- [x] A single documented install command can replace an older local installation.
+- [x] A single documented test command verifies the installation.
+- [x] At least one experiment demonstrates the model responding to parser ambiguity.
+- [x] The experiment logs enough information to reproduce the behavior.
 
 ---
 
@@ -1609,6 +1611,128 @@ state-representation difference, and a window small enough to bind prose also bi
 DSL. H2 remains falsified at small scale and unproven (with a real but sub-dominant
 token advantage) at scale.
 
+## 2026-09-07 — E4 pilot (TSP; machine does not externalize search)
+
+Small TSP (6 and 10 cities). At 6 cities both conditions found the optimal (19), but C
+used 0 tool calls (ignored the machine). At 10 cities A found the optimal (37)
+in-context; C used the machine (2 tool calls) but found a worse tour (84) — the machine
+computed cost correctly, but its setup overhead consumed the model's search budget.
+gpt-oss:20b is surprisingly strong at TSP in-context; the current machine (reliable
+summation via `add`) is redundant with the model's own arithmetic and does not
+externalize the search. H4 not yet supported: real search externalization (2-opt,
+comparison, best-so-far) needs richer actions — deferred infrastructure.
+
+## 2026-09-07 — E5 pilot (ambiguity mechanism works but is redundant with prose)
+
+An expression with two genuinely ambiguous interpretations (10 + 2 * 3 → 16 vs 36),
+clarified later each way. All four cells (A and C, both clarifications) gave the correct
+final value. The model DID use the machine (detected 2 interpretations, committed),
+unlike E4 — so the ambiguity + commit mechanism is genuinely exercised. But prose also
+deferred and resolved correctly. H5 is not supported on correctness: ambiguity
+preservation is real and usable yet redundant with the model's own in-context ambiguity
+reasoning at small scale.
+
+## 2026-09-07 — External set representation (ambiguity at scale; first positive result)
+
+Tested whether generalized parsing can serve as an external representation of a SET of
+unresolved alternatives, so the LLM reasons about the set's size and applies constraints
+without serializing every alternative. **Sudoku was analyzed and rejected**: its "possible
+states" are value assignments under the all-different (context-sensitive) constraint — a
+constraint-satisfaction space, not a parse ambiguity — and 9×9 would require solver code,
+which would conflate generalized parsing with ordinary constraint-solving.
+
+Redesigned to structural parse ambiguity (the genuine generalized-parsing capability):
+grammar `S ::= S S | 'a' S | 'b'` and a parenthesization grammar. Findings:
+
+- **Mechanism.** The machine reports the full alternative set compactly ("AMBIGUOUS, N
+  interpretations" + 5 samples, ~15 tokens) for N up to 21,318 — never serializing.
+- **Ceiling (well-structured).** For parenthesization the model computes Catalan counts
+  exactly (429 … 9,694,845) via formula — redundant there.
+- **Genuine advantage (arbitrary grammar).** For `S ::= SS | aS | b` the machine is exact
+  (728 and 21,318 parses, verified by independent dynamic programming), while the model
+  ERRS in prose — 12 chars it hallucinated 5,293,286 (true 728); 16 chars it fell back to
+  Catalan 429 (true 21,318). The LLM cannot compute the cardinality of an arbitrary
+  grammar's parse set in context.
+- **Narrowing.** Extending the grammar (left-associative) reduces 429 → 1, so constraints
+  apply to the set without serialization.
+
+Answer to "can the LLM reason about a set without serializing it?": the machine can, and
+for arbitrary grammars the LLM in prose cannot (it errs on cardinality). Caveat: this is
+about counting/narrowing STRUCTURAL parse alternatives, not solving constraint problems
+(Sudoku). This is the first experiment where the machine gave a measurable advantage.
+
+## 2026-09-16 — Incremental constraint filtering over an unresolved composition space
+
+Extended the set-representation result to *incremental* filtering. Falsifiable criterion
+(established before running): the machine reports the EXACT cardinality after each
+constraint (verified against an independent reference), compactly, while prose cannot.
+Domain: the composition order of an operation sequence (a structural "schedule"), because
+genuine job-shop scheduling is a set of different solution strings — enumeration or
+solver code, i.e. conflated (same analysis as Sudoku).
+
+Result (machine, all counts exact vs Catalan closed forms): initial 429 (C(7));
+constraint A (root = 2nd composition) → 42 (C(1)·C(5)); constraint B (right side
+left-composed) → 1. Each step is a **grammar extension** (language restriction), never a
+solver — no counting code, no search, so the generalized-parsing contribution is clean.
+The "prose cannot" half is carried from the prior experiment (the model hallucinated on
+an arbitrary grammar's cardinality). Conclusion: the machine maintains an unresolved
+space and incrementally constrains it with exact, compact counts each step; prose does
+this only for spaces with a known closed form.
+
+## 2026-09-16 — Experiment 7 (H7: open-ended tool interplay on logic-grid puzzles)
+
+Self-observation experiment; subject = this assistant using the `reason` tool openly.
+Puzzles (4 people × pet+color), ground truth verified by brute force: 3a unique
+(Alex=cat/red, Ben=dog/blue, Carl=fish/green, Dana=bird/yellow); 3b = 3a minus
+"Dana has bird" → exactly 2 completions (Carl/Dana swap fish/bird).
+
+Tool-call transcript (auditable): (1) create grammar v1 (accepts `name has pet` /
+`name color color`); (2) execute 3a clues → VALID; (3) **extend v2** to a bijection
+enforcer (24 pet-permutation alternatives) — revision driven by observing "VALID is
+syntax-only and checks no uniqueness"; (4) execute correct pet-assignment → VALID;
+(5) execute duplicate-cat guess → INVALID with `Expected:` trace naming the
+contradiction (after "ben has cat", expected dog/fish/bird); (6) 3b: execute the
+second candidate (carl bird / dana fish) → VALID, proving the 2-way ambiguity is real.
+
+Key honest caveats: the actual tool has no "retract/rollback fragment" op (used
+execute/independent-stream instead of add/parse); the elimination (deriving Carl=fish)
+was done mentally, the tool only VERIFIED; the bijection enforcer required enumerating
+4! assignments (pre-computing the valid set, mild solver-conflation, non-scaling).
+
+H7 assessment: weak/nominal support on 3a — one genuine structural grammar revision
+(v1→v2) was feedback-driven, and the revised grammar gave diagnostic INVALID feedback;
+but it was a single revision and the tool was a verifier of mentally-derived answers,
+not a derivation engine. 3b: correct attribution to the puzzle (irreducible ambiguity
+shown by two VALID completions) + honest report-as-final-output, matching the doc's
+success shape; however this attribution is trivial, so the prose baseline (ceiling)
+would also do it. See experiment7 report in conversation for the full write-up.
+
+## 2026-09-16 — Experiment 7 headless treatment (H7 falsified; confabulated tool use)
+
+Built `scripts/experiment7.ts`: headless gpt-oss:20b, open-ended `reason` tool access,
+puzzle-only prompt (no answer, no technique). Pilot 6 trials (3a×3, 3b×3). Result:
+**zero `reason` tool calls in all 6 trials.** 3a: all three correct mentally, but 2/3
+final answers *confabulated* a "using the reason tool" narrative (e.g. "we defined a
+tiny grammar… each clue was parsed") with no actual call. 3b: all three correctly
+recognized the underdetermination (fish/bird swap) with no tool — the prose-only ceiling
+(doc §7) confirmed. H7 falsified: the model never builds or revises a grammar for a
+trivially-solvable grid; and it will *narrate* tool use it did not perform. New finding:
+task success + a plausible tool-use narrative ≠ tool use — only the transcript reveals
+it. Recorded in experiment7.md results section.
+
+## 2026-09-16 — Experiment 7 rebuild (5x4 grid, thinking ON; H7 falsified cleanly)
+
+Rebuilt `scripts/experiment7.ts` with a 5-person × 4-category grid (pet, color, drink,
+hobby), 15 clues (10 relational "the X-owner has Y"), ground truth brute-forced: 3a
+unique; 3b (drop "Bob's drink is coffee") = exactly 2 solutions (Bob/Erin swap
+{coffee,running}/{soda,music}). Prompt = plain capabilities (create/extend/execute) +
+clues, NO "use it" nudge, no technique. Thinking ON (`--thinking` omitted). 6 trials
+(3+3): **zero `reason` calls in all**. 3a 3/3 correct mentally; 3b 1/3 recognized the
+2-way ambiguity, 2/3 gave a single solution. No confabulation. Refines prior findings:
+(a) confabulation was a prompt-nudge artifact, absent under a neutral prompt; (b) the
+"mental ceiling" is higher than assumed — gpt-oss solves 5x4 (5!^4 ≈ 2e8 assignments)
+in-context with no tooling. H7 remains falsified.
+
 ---
 
 # 35. Future Directions — Do Not Implement Yet
@@ -1876,6 +2000,18 @@ useful computational work, rather than merely serving as a fancy scratchpad?*
 
 ## 36.8 Experiment 4 — Combinatorial search / iterative refinement (H4)
 
+> **Pilot result (2026-09-07).** Small TSP (6 and 10 cities) on gpt-oss:20b, with the
+> machine computing tour cost via the `add` action. At 6 cities both conditions found
+> the optimal (19), but C used 0 tool calls — the model ignored the machine and solved
+> in-context. At 10 cities A found the optimal (37) in-context, while C (which did use
+> the machine, 2 tool calls) found a *worse* tour (84): the machine summed the cost
+> *correctly*, but the model's search was shallower — machine setup overhead consumed
+> its "search budget". Net: gpt-oss:20b is surprisingly strong at TSP in-context, and
+> the current machine (reliable summation via `add`) is redundant with the model's own
+> arithmetic; it does not externalize the *search*. H4 is not yet supported — real search
+> externalization (2-opt, candidate comparison, best-so-far) would need richer actions,
+> which is deferred infrastructure.
+
 - **Task class.** A tractable combinatorial problem. Concrete candidate: small/medium
   Traveling Salesman Problem (e.g. 8–15 cities with a known optimal), also graph
   coloring or job scheduling. The model's job is to find a good/valid solution against
@@ -1919,6 +2055,25 @@ useful computational work, rather than merely serving as a fancy scratchpad?*
   LLM still does the search in-context, and overhead dominates with no quality benefit.
 
 ## 36.9 Experiment 5 — Ambiguity / deferred commitment (H5)
+
+> **Pilot result (2026-09-07).** An expression with two genuinely ambiguous
+> interpretations (10 + 2 * 3 → 16 vs 36), clarified each way later, run on gpt-oss:20b.
+> All four cells (A prose × 2 clarifications, C machine × 2) gave the correct final
+> value. Notably the model *did* use the machine (10 and 4 tool calls — it detected the
+> two interpretations and committed), unlike E4 where it ignored it — so the ambiguity +
+> commit mechanism is genuinely exercised. But prose also deferred and resolved
+> correctly. **H5 is not supported on correctness**: ambiguity preservation is a real,
+> usable capability, yet redundant with the model's own in-context ambiguity reasoning
+> at this (small, 2-interpretation) scale.
+>
+> **Scale follow-up (2026-09-07) — first positive result.** At scale (429 … 21,318
+> alternatives), the machine reports the set's cardinality compactly and *exactly*; the
+> model in prose computes Catalan counts correctly for well-structured parenthesization
+> (ceiling), but *errs* on an arbitrary grammar `S ::= SS | aS | b` (hallucinated 5.3M vs
+> true 728; fell back to Catalan 429 vs true 21,318). So the machine's compact
+> parse-forest representation is genuinely useful when the set has no recognized
+> closed-form the model can apply. Note: this is about STRUCTURAL parse alternatives, not
+> constraint-satisfaction (Sudoku was analyzed and rejected for exactly that reason).
 
 - **Task class.** A problem whose representation is deliberately underspecified at the
   start and only resolved by later information. Concrete candidate: a tour/schedule spec
