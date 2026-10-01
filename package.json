@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "omp": {
-    "extensions": ["./src/extension.ts"]
+    "extensions": ["./src/extension.ts", "./src/turn-parser-extension.ts"]
   },
   "scripts": {
     "test": "node --experimental-strip-types --test \"tests/*.test.ts\"",

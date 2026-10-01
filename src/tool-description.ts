@@ -38,7 +38,14 @@ const OBSERVATION_GRAMMAR = [
   "whitespace ~ [\\s]+",
 ].join("\n");
 
-export const TOOL_DESCRIPTION = `Operate an ambiguity-preserving reasoning state backed by a generalized parser (Marpa).
+export const TOOL_DESCRIPTION = `Maintain and explore an ambiguity-preserving symbolic workspace using a generalized parser.
+
+Use it when reasoning involves multiple possible interpretations, competing hypotheses,
+structural alternatives, or constraints that must be checked across many possibilities.
+You can construct or revise the grammar, preserve alternatives without explicitly
+enumerating them, execute queries against the resulting state, and inspect which
+possibilities remain valid.
+
 Each state holds an immutable versioned grammar. A grammar is an installed, executable artifact:
 it can be CONSTRUCTED once and then process many independent input streams.
 

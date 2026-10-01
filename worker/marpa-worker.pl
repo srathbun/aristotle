@@ -211,6 +211,41 @@ sub op_parse {
     send_response({ id => $id, ok => $TRUE, %$result });
 }
 
+# Stateless, side-effect-free parse: compile a throwaway grammar and recognize the
+# join of `fragments` under it. Used to model `parse(grammar, prefix)` as a pure
+# deterministic computation (a PromiseFlow-addressable segment). Touches NO %STATES.
+sub op_parse_once {
+    my ($id, $req) = @_;
+    my $grammar = $req->{grammar};
+    if (!defined $grammar || !length "$grammar") {
+        send_error($id, "BAD_ARGS", "parse_once requires a non-empty 'grammar' string");
+        return;
+    }
+    my $fragments = $req->{fragments};
+    if (ref($fragments) ne 'ARRAY') {
+        send_error($id, "BAD_ARGS", "parse_once requires a 'fragments' array");
+        return;
+    }
+    my $g;
+    my $ok = eval { $g = compile_grammar($grammar); 1 };
+    if (!$ok) {
+        send_error($id, "GRAMMAR_ERROR", clean_error($@));
+        return;
+    }
+    my $input = join " ", map { defined $_ ? "$_" : "" } @$fragments;
+    my ($status, $value_count, $values, $error, $progress) = enumerate_values($g, $input);
+    my $resp = {
+        id => $id, ok => $TRUE,
+        status          => $status,
+        value_count     => $value_count,
+        values          => $values,
+        fragment_count  => scalar @$fragments,
+    };
+    $resp->{error} = $error if defined $error;
+    $resp->{progress} = $progress if defined $progress;
+    send_response($resp);
+}
+
 sub op_inspect {
     my ($id, $req) = @_;
     my $state = get_state($id, $req->{state_id}) or return;
@@ -422,6 +457,7 @@ while (defined(my $line = <STDIN>)) {
     if    ($op eq 'create')  { op_create($id, $req); }
     elsif ($op eq 'add')     { op_add($id, $req); }
     elsif ($op eq 'parse')   { op_parse($id, $req); }
+    elsif ($op eq 'parse_once') { op_parse_once($id, $req); }
     elsif ($op eq 'inspect') { op_inspect($id, $req); }
     elsif ($op eq 'extend')  { op_extend($id, $req); }
     elsif ($op eq 'execute') { op_execute($id, $req); }
