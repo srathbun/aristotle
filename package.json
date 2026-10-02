@@ -10,7 +10,10 @@
     "test": "node --experimental-strip-types --test \"tests/*.test.ts\"",
     "smoke": "node --experimental-strip-types scripts/smoke.ts",
     "typecheck": "npx tsc --noEmit",
-    "install:omp": "powershell -ExecutionPolicy Bypass -File scripts/install-omp.ps1"
+    "setup": "bash scripts/setup-env.sh",
+    "setup:win": "powershell -ExecutionPolicy Bypass -File scripts/setup-env.ps1",
+    "install:omp": "bash scripts/install-omp.sh",
+    "install:omp:win": "powershell -ExecutionPolicy Bypass -File scripts/install-omp.ps1"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

@@ -1,7 +1,7 @@
 # OMP + Marpa Reasoning POC
 
 An omp TypeScript extension that registers an LLM-callable `reason` tool backed by a
-persistent Strawberry Perl worker running Marpa::R2. The tool exposes `create` / `add` /
+persistent Perl worker running Marpa::R2. The tool exposes `create` / `add` /
 `parse` / `inspect` / `extend` / `execute` / `commit` / `fork` / `reset` over versioned,
 immutable grammars, and reports ambiguity as first-class data (`VALID` / `AMBIGUOUS` /
 `INVALID`).
@@ -64,36 +64,44 @@ Pending experiments: **E3** (constructed computation — no grammar prescribed) 
 
 ## Prerequisites
 
-- omp (tested on 18.1.12)
-- Node 22+ (test runner + typecheck)
-- Strawberry Perl + `Marpa::R2` (installed by the setup script)
+- **Perl + a C toolchain** (`gcc` + `make`) — needed to compile `Marpa::R2`.
+  - macOS: `brew install perl`
+  - Debian/Ubuntu: `sudo apt install perl gcc make`
+- **`Marpa::R2`** (CPAN module) — install via `npm run setup` below.
+- **Node 22+** — runs the test runner, typecheck, and install scripts.
+- **omp** — `npm run install:omp` registers the extension into your omp config.
 
 ## Setup
 
-```powershell
-scripts/setup-env.ps1   # installs Strawberry Perl + Marpa::R2 (idempotent; may prompt for admin)
-npm install             # typescript + @types/node (dev only; no runtime deps)
+```bash
+npm install        # typescript + @types/node (dev only; no runtime deps)
+npm run setup      # verifies perl/Marpa::R2 or installs Marpa::R2 via cpanm (idempotent)
 ```
+
+`setup` honors a `MARP_PERL=<path>` env override to select a specific interpreter; if
+`perl` is missing it prints distro-specific install instructions and exits with a clear
+error (it does **not** install a Perl distribution for you).
 
 ## Test
 
-```powershell
-npm run typecheck       # npx tsc --noEmit
-npm test                # worker protocol + state tests (spawns perl directly, no omp)
+```bash
+npm run typecheck  # npx tsc --noEmit
+npm test           # worker protocol + state tests (spawns perl directly, no omp)
 ```
 
 ## Install into omp (idempotent)
 
-```powershell
+```bash
 npm run install:omp
 ```
 
-Detects an existing install, removes/replaces it, links the current repo, and verifies
-discoverability.
+Runs `npx tsc --noEmit`, then ensures this repo's absolute path is listed under an
+`extensions:` key in `~/.omp/agent/config.yml`, then verifies the entry is present.
+Safe to re-run.
 
 ## Smoke test (end-to-end, uses the configured local task model)
 
-```powershell
+```bash
 npm run smoke
 ```
 
@@ -103,15 +111,36 @@ ambiguity commit, and runtime repair (`execute INVALID` → extend → `execute 
 `SMOKE_MODEL` to override the model (default `ollama/gpt-oss:20b`); `SMOKE_RUN=N` runs a
 single scenario.
 
+## Turn parser (opt-in)
+
+A second extension, `src/turn-parser-extension.ts`, feeds each completed assistant turn into
+a dangling-else grammar and injects a compact parser summary into context (the M14
+incrementality experiment). It is **off by default** so it never leaves artifacts in sessions
+that are not doing turn-parsing work. Enable it by setting `ARISTOTLE_TURN_PARSER=1` in the
+omp process environment:
+
+```sh
+ARISTOTLE_TURN_PARSER=1 omp --extension ./src/turn-parser-extension.ts
+```
+
+## Windows
+
+Native Windows uses the PowerShell helpers: `npm run setup:win` (installs Strawberry Perl
++ `Marpa::R2` via winget/cpanm) and `npm run install:omp:win`. The shell scripts
+(`setup`, `install:omp`) target Linux/macOS; on Windows run them under WSL with a
+Linux Perl, or use the PowerShell helpers directly.
+
 ## Layout
 
 - `src/extension.ts` — omp extension entry (registers `reason`)
 - `src/worker-client.ts` — JSONL client for the Perl worker
 - `src/state.ts` — durable reasoning-state model + session reconstruction
 - `src/tool-description.ts` — LLM-facing tool contract + SLIF cheat-sheet
+- `src/turn-parser.ts`, `src/turn-parser-extension.ts` — opt-in turn parser (M14; off by default)
 - `worker/marpa-worker.pl` — Marpa::R2 worker
 - `grammars/*.slif` — example grammars (dependency, ambiguity, ambiguous-exec, commands, observation)
-- `scripts/setup-env.ps1`, `scripts/install-omp.ps1`, `scripts/smoke.ts`
+- `scripts/setup-env.sh`, `scripts/install-omp.sh`, `scripts/smoke.ts`
+- `scripts/setup-env.ps1`, `scripts/install-omp.ps1` — Windows-only helpers
 - `scripts/experiment1.ts` … `scripts/experiment5.ts` — research experiment harnesses
 - `tests/` — worker protocol + state tests
 - `docs/manual-smoke.md` — manual walkthrough
