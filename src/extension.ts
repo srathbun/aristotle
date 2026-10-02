@@ -117,6 +117,17 @@ function formatCommit(r: WorkerResponse): ToolResult {
   return { content: [{ type: "text", text }], details: { status: "VALID", grammar_version: r.grammar_version, index, chosen, output, emitted, vars } };
 }
 
+// Grammar-authoring cost: the model does not inherit a grammar for free — every
+// `create`/`extend` that carries a `grammar` string is an LLM output-token spend
+// (chars/4 heuristic, same as promiseflow's segment instrumentation). This is the
+// one-time setup cost the paper's dedup savings must be measured net of.
+const grammarAuthoring = { events: 0, tokens: 0 };
+
+/** chars/4 token estimate for grammar source the model emits (magic-constant heuristic). */
+function estimateGrammarTokens(grammar: string): number {
+  return Math.max(1, Math.round(grammar.length / 4));
+}
+
 export default function (pi: ExtensionAPI) {
   const z = pi.zod;
   const worker = new WorkerClient({ onStderr: (line) => pi.logger?.debug?.(`[marpa-worker] ${line}`) });
@@ -198,9 +209,13 @@ export default function (pi: ExtensionAPI) {
     if (!resp.ok || typeof resp.state_id !== "string") return workerErr(resp, "create");
     const state = store.adoptNew(resp.state_id, p.grammar);
     await persist(state);
+    grammarAuthoring.events += 1;
+    grammarAuthoring.tokens += estimateGrammarTokens(p.grammar);
     return ok(`Created reasoning state '${state.stateId}' (grammar v${state.grammarVersion}).`, {
       state_id: state.stateId,
       grammar_version: state.grammarVersion,
+      grammar_author_tokens: grammarAuthoring.tokens,
+      authoring_events: grammarAuthoring.events,
     });
   }
 
@@ -253,9 +268,13 @@ export default function (pi: ExtensionAPI) {
     if (!state) return err(`state '${p.state_id}' not found`);
     state.advanceGrammar(resp.grammar_version, p.grammar, pr);
     await persist(state);
+    grammarAuthoring.events += 1;
+    grammarAuthoring.tokens += estimateGrammarTokens(p.grammar);
     return ok(`Extended to grammar v${resp.grammar_version}. ${pr ? describeParse(pr) : "no parse result"}`, {
       state_id: state.stateId,
       grammar_version: resp.grammar_version,
+      grammar_author_tokens: grammarAuthoring.tokens,
+      authoring_events: grammarAuthoring.events,
     });
   }
 

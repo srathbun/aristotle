@@ -8,6 +8,10 @@
 //   next LLM request          →  context          →  inject compact summary
 //
 // Tool-call blocks are recorded for diagnostics but not parsed.
+//
+// Opt-in: this is a research harness, not a default feature. It is silent unless
+// ARISTOTLE_TURN_PARSER is set to a truthy value (1/true/yes/on), so an unrelated
+// session never accumulates turns nor injects `[Aristotle turn parser]` context.
 import type { ExtensionAPI, ExtensionContext } from "./types.ts";
 import { WorkerClient } from "./worker-client.ts";
 import { TurnParserSession, TURN_STATE_CUSTOM_TYPE } from "./turn-parser.ts";
@@ -41,6 +45,11 @@ function extractToolNames(content: unknown): string[] {
 }
 
 export default function (pi: ExtensionAPI): void {
+  // Opt-in switch: off by default so the parser never leaves artifacts in sessions
+  // not doing turn-parsing work. Enable per-session with ARISTOTLE_TURN_PARSER=1.
+  const enabled = ["1", "true", "yes", "on"].includes((process.env.ARISTOTLE_TURN_PARSER ?? "").toLowerCase());
+  if (!enabled) return;
+
   const worker = new WorkerClient({ onStderr: (line) => pi.logger?.debug?.(`[turn-parser worker] ${line}`) });
 
   const session = new TurnParserSession(worker, {
